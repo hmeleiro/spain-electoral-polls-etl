@@ -1,0 +1,37 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+.Renviron
+.Renviron.*
+
+# R session files
+.Rhistory
+.RData
+.Ruserdata
+
+# RStudio
+.Rproj.user/
+
+# renv local state
+renv/library/
+renv/staging/
+renv/python/
+renv/sandbox/
+
+# R package build/check artifacts
+*.Rcheck/
+*.tar.gz
+*.tgz
+
+# Test and cache artifacts
+.testthat/
+.cache/
+cache/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
