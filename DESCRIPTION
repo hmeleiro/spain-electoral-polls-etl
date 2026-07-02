@@ -1,0 +1,33 @@
+Package: spainelectoralpolls
+Title: Spain Electoral Polls Scraper
+Version: 0.1.0
+Authors@R: c(
+    person("Spain Electoral Project", role = c("aut", "cre"), email = "maintainers@example.com")
+  )
+Description: Scrapes Spanish national voting intention polls from Wikipedia and stores them in PostgreSQL.
+License: MIT
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 4.2)
+Imports:
+    DBI,
+    RPostgres,
+    cli,
+    digest,
+    dplyr,
+    glue,
+    httr2,
+    janitor,
+    jsonlite,
+    logger,
+    lubridate,
+    rvest,
+    stringr,
+    testthat (>= 3.0.0),
+    tidyr,
+    xml2
+Suggests:
+    renv
+Config/testthat/edition: 3
