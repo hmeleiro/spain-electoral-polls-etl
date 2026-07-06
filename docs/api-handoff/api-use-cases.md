@@ -9,7 +9,7 @@ Serie temporal de `vote_share` para uno o varios partidos.
 ### Filtros necesarios
 `election_key`, `territory_code`, `party_key`, `fieldwork_start`, `fieldwork_end`, `publication_date`.
 ### Campos de salida esperados
-`poll_id`, `date`, `party_key`, `party_raw`, `vote_share`, `pollster_name`, `media`, `sample_size`.
+`poll_id`, `date`, `party_key`, `party_raw`, `party_name`, `short_name`, `color_hex`, `vote_share`, `pollster_name`, `media`, `sample_size`.
 ### Notas para la API
 Aplicar por defecto `is_active = true` y excluir `manual_review`.
 
@@ -107,15 +107,15 @@ Puede implementarse con `/api/v1/timeseries`.
 ## Caso de uso: Listar partidos disponibles
 
 ### Descripcion
-Catalogo derivado de partidos presentes en resultados.
+Catalogo canonico de partidos soportados por el sistema.
 ### Tablas implicadas
-`poll_results`, `polls`, `elections`.
+`parties`, opcionalmente `poll_results`, `polls`, `elections` para conteos.
 ### Filtros necesarios
 `election_key`, `active_only`.
 ### Campos de salida esperados
-`party_key`, `party_raw`, `poll_count`.
+`party_key`, `party_name`, `short_name`, `territory_code`, `color_hex`, `display_order`, opcionalmente `poll_count`.
 ### Notas para la API
-No hay tabla `parties`; usar agregacion.
+Usar `parties` como fuente canonica; si se calculan conteos, unir con resultados mediante `left join`.
 
 ## Caso de uso: Listar encuestadoras disponibles
 
@@ -159,15 +159,43 @@ Debe ser comportamiento default, no una excepcion.
 ## Caso de uso: Consultar casos en revision manual para depuracion
 
 ### Descripcion
-Listado de encuestas ambiguas para revision.
+Listado visual de encuestas ambiguas o con anomalias para revision administrativa.
 ### Tablas implicadas
-`polls`, `pollsters`, `elections`, `poll_identity_events`.
+Preferentemente `admin_poll_review_queue`; internamente usa `polls`, `pollsters`, `elections`, `poll_identity_events`, `poll_review_actions` y vistas de anomalias.
 ### Filtros necesarios
-`identity_status = 'manual_review'`, fechas, pagina.
+`election_key`, `page_key`, `review_status`, `limit`, `offset`.
 ### Campos de salida esperados
-Metadatos, `identity_confidence`, eventos recientes.
+Metadatos, fuente, `identity_confidence`, conteo de anomalias, `review_status`, `review_priority`, eventos recientes y array `anomalies`.
 ### Notas para la API
-Endpoint administrativo.
+Endpoint administrativo consumido por `admin-ui/`. Debe devolver respuesta paginada con `items`, `limit`, `offset`, `total`.
+
+## Caso de uso: Revisar visualmente una encuesta concreta
+
+### Descripcion
+Ficha de revision con resultados, anomalias, fuente y razones de matching.
+### Tablas implicadas
+Preferentemente `admin_poll_review_detail`.
+### Filtros necesarios
+`poll_id`.
+### Campos de salida esperados
+Metadatos completos de la encuesta, `anomalies`, `results`, `match_candidates`, `source_metadata`, `latest_identity_event_reasons`, `latest_payload_json`.
+### Notas para la API
+Endpoint administrativo consumido por `admin-ui/`. Devolver `404` si no existe la encuesta.
+
+## Caso de uso: Registrar decision de revision manual
+
+### Descripcion
+Guardar la decision de un administrador y actualizar la visibilidad de la encuesta cuando proceda.
+### Tablas implicadas
+`polls`, `poll_review_actions`, `poll_identity_events`.
+### Filtros necesarios
+`poll_id`.
+### Campos de entrada esperados
+`action`, `reviewer`, `notes`, `corrected_payload`.
+### Campos de salida esperados
+`poll_id`, `review_action_id`, `action`.
+### Notas para la API
+Debe ser transaccional. Acciones validas: `approved_new_poll`, `approved_match`, `rejected`, `needs_fix`, `comment`.
 
 ## Caso de uso: Consultar historico de versiones de una encuesta para auditoria
 

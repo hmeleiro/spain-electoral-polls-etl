@@ -49,3 +49,56 @@ test_that("publication dates parse from citation-like values", {
   expect_equal(parse_publication_date("2026-06-02"), as.Date("2026-06-02"))
   expect_equal(parse_publication_date("2 June 2026"), as.Date("2026-06-02"))
 })
+
+test_that("CIS alternative projections normalize estimator and source roles", {
+  record <- list(
+    year = 2026L,
+    pollster_raw = "CIS (Ateneo del Dato)",
+    fieldwork_raw = "1-5 Jun",
+    sample_size_raw = "2,000",
+    turnout_raw = "?",
+    lead_raw = "4.0",
+    source_url = "https://example.com/cis-ateneo",
+    source_title = "CIS reestimate",
+    source_reference_ids = c("cite_note-a"),
+    source_metadata = list(
+      cite_note_a = list(
+        reference_text = "Alternative projection based on raw CIS data."
+      )
+    ),
+    notes = NA_character_,
+    row_number = 1L,
+    wiki_page = "next_spanish_general_election",
+    wiki_revision_id = 123L,
+    results = list(
+      list(party_raw = "PP", raw_value = "32.0"),
+      list(party_raw = "PSOE", raw_value = "28.0"),
+      list(party_raw = "Vox", raw_value = "15.0")
+    )
+  )
+
+  poll <- normalize_poll_record(record)
+
+  expect_equal(poll$pollster_raw, "Ateneo del Dato")
+  expect_equal(poll$pollster_key, "ateneo_del_dato")
+  expect_equal(poll$media, "CIS")
+  expect_equal(poll$media_key, "cis")
+  expect_equal(poll$poll_variant, "reestimate")
+  expect_equal(poll$base_pollster_key, "cis")
+  expect_equal(poll$source_metadata$estimate_type, "reestimate")
+  expect_match(poll$poll_key_strict, "ateneo_del_dato__cis")
+  expect_match(poll$poll_key_strict, "reestimate__cis__cis")
+
+  record$pollster_raw <- "CIS (LogosLab)"
+  record$source_url <- "https://example.com/cis-logoslab"
+  poll <- normalize_poll_record(record)
+
+  expect_equal(poll$pollster_raw, "LogosLab")
+  expect_equal(poll$pollster_key, "logoslab")
+  expect_equal(poll$media, "CIS")
+  expect_equal(poll$media_key, "cis")
+  expect_equal(poll$poll_variant, "reestimate")
+  expect_equal(poll$base_pollster_key, "cis")
+  expect_match(poll$poll_key_strict, "logoslab__cis")
+  expect_match(poll$poll_key_strict, "reestimate__cis__cis")
+})

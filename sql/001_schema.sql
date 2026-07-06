@@ -41,6 +41,17 @@ create table if not exists pollsters (
   created_at timestamptz not null default now()
 );
 
+create table if not exists parties (
+  party_key text primary key,
+  party_name text not null,
+  short_name text not null,
+  territory_code text not null default 'ES',
+  color_hex text,
+  display_order integer,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists polls (
   id bigserial primary key,
   poll_key_strict text not null unique,
@@ -119,6 +130,31 @@ create table if not exists scraper_runs (
   error_message text
 );
 
+create table if not exists poll_review_actions (
+  id bigserial primary key,
+  poll_id bigint not null references polls(id) on delete cascade,
+  action text not null
+    check (action in ('approved_new_poll', 'approved_match', 'rejected', 'needs_fix', 'comment')),
+  previous_identity_status text,
+  new_identity_status text,
+  reviewer text,
+  notes text,
+  corrected_payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists poll_match_candidates (
+  id bigserial primary key,
+  poll_id bigint not null references polls(id) on delete cascade,
+  candidate_poll_id bigint not null references polls(id) on delete cascade,
+  wiki_revision_id bigint,
+  rank integer not null,
+  confidence numeric,
+  reasons jsonb not null default '[]'::jsonb,
+  candidate_snapshot jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 insert into elections (election_key, election_type, territory_code, election_name, election_date)
 values ('congreso_espana_2027', 'general', 'ES', 'Next Spanish general election', null)
 on conflict (election_key) do update set
@@ -151,11 +187,78 @@ on conflict (page_key) do update set
   territory_code = excluded.territory_code,
   is_active = excluded.is_active;
 
+insert into parties
+  (party_key, party_name, short_name, territory_code, color_hex, display_order, is_active)
+values
+  ('psoe', 'Partido Socialista Obrero Espanol', 'PSOE', 'ES', '#e30613', 10, true),
+  ('pp', 'Partido Popular', 'PP', 'ES', '#1d84ce', 20, true),
+  ('vox', 'Vox', 'Vox', 'ES', '#63be21', 30, true),
+  ('sumar', 'Sumar', 'Sumar', 'ES', '#e51b7e', 40, true),
+  ('podemos', 'Podemos', 'Podemos', 'ES', '#6f2c91', 50, true),
+  ('cs', 'Ciudadanos', 'Cs', 'ES', '#eb6109', 60, true),
+  ('erc', 'Esquerra Republicana de Catalunya', 'ERC', 'ES-CT', '#f3b217', 70, true),
+  ('junts', 'Junts per Catalunya', 'Junts', 'ES-CT', '#00a6a6', 80, true),
+  ('eh_bildu', 'EH Bildu', 'EH Bildu', 'ES-PV', '#b5c800', 90, true),
+  ('eaj_pnv', 'EAJ/PNV', 'PNV', 'ES-PV', '#00843d', 100, true),
+  ('bng', 'Bloque Nacionalista Galego', 'BNG', 'ES-GA', '#76b82a', 110, true),
+  ('cup', 'Candidatura d''Unitat Popular', 'CUP', 'ES-CT', '#ffed00', 120, true),
+  ('cca', 'Coalicion Canaria', 'CCa', 'ES-CN', '#f6c915', 130, true),
+  ('upn', 'Union del Pueblo Navarro', 'UPN', 'ES-NC', '#005baa', 140, true),
+  ('na', 'Navarra Suma', 'NA+', 'ES-NC', '#005baa', 140, true),
+  ('prc', 'Partido Regionalista de Cantabria', 'PRC', 'ES-CB', '#c8102e', 150, true),
+  ('ev', 'Espana Vaciada', 'EV', 'ES', '#8f8f8f', 160, true),
+  ('mas_pais', 'Mas Pais', 'MP', 'ES', '#14b8a6', 170, true),
+  ('pacma', 'PACMA', 'PACMA', 'ES', '#7ac143', 180, true),
+  ('adelante_andalucia', 'Adelante Andalucia', 'AA', 'ES-AN', '#00a3ad', 190, true),
+  ('salf', 'Se Acabo La Fiesta', 'SALF', 'ES', '#5bc0de', 200, true),
+  ('alianca_cat', 'Alianca Catalana', 'AC', 'ES-CT', '#2f80ed', 210, true),
+  ('te', 'Teruel Existe', 'TE', 'ES-AR', '#007B4D', 212, true),
+  ('others', 'Others', 'Others', 'ES', null, 999, true)
+on conflict (party_key) do update set
+  party_name = excluded.party_name,
+  short_name = excluded.short_name,
+  territory_code = excluded.territory_code,
+  color_hex = excluded.color_hex,
+  display_order = excluded.display_order,
+  is_active = excluded.is_active;
+
 insert into wiki_pages (page_key, page_title, url, election_key, territory_code, is_active)
 values (
   'spanish_general_election_2023',
   'Opinion polling for the 2023 Spanish general election',
   'https://en.wikipedia.org/wiki/Opinion_polling_for_the_2023_Spanish_general_election',
+  'congreso_espana_2023',
+  'ES',
+  true
+)
+on conflict (page_key) do update set
+  page_title = excluded.page_title,
+  url = excluded.url,
+  election_key = excluded.election_key,
+  territory_code = excluded.territory_code,
+  is_active = excluded.is_active;
+
+insert into wiki_pages (page_key, page_title, url, election_key, territory_code, is_active)
+values (
+  'spanish_general_election_2023_2022',
+  'Nationwide opinion polling for the 2023 Spanish general election (2022)',
+  'https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2023_Spanish_general_election_(2022)',
+  'congreso_espana_2023',
+  'ES',
+  true
+)
+on conflict (page_key) do update set
+  page_title = excluded.page_title,
+  url = excluded.url,
+  election_key = excluded.election_key,
+  territory_code = excluded.territory_code,
+  is_active = excluded.is_active;
+
+insert into wiki_pages (page_key, page_title, url, election_key, territory_code, is_active)
+values (
+  'spanish_general_election_2023_2019_2021',
+  'Nationwide opinion polling for the 2023 Spanish general election (2019-2021)',
+  'https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2023_Spanish_general_election_(2019%E2%80%932021)',
   'congreso_espana_2023',
   'ES',
   true

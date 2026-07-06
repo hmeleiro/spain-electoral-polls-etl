@@ -23,7 +23,7 @@
 
 - Si `identity_status = 'new_poll'` debe tratarse publicamente igual que `exact` y `probable_match`. Recomendacion actual: si `is_active = true`, incluirlo salvo que haya politica posterior distinta.
 - Como representar medios de forma canonica. Hoy solo existe `polls.media`; no existe `media_key` SQL.
-- Si crear una tabla `parties` con metadatos de partido. Hoy la lista se deriva de `poll_results`.
+- Como mantener actualizado el catalogo `parties` cuando Wikipedia introduzca partidos no catalogados. El scraper no falla por claves nuevas, pero la API solo tendra metadatos enriquecidos si se anaden al catalogo.
 - Si exponer `identity_status` en respuestas publicas. Recomendacion: si se expone, hacerlo como metadato simple y no incluir `identity_confidence`.
 - Si endpoints administrativos requeriran autenticacion desde la primera version. Recomendacion: si existen, protegerlos.
 - Como corregir manualmente una encuesta marcada `manual_review`. El esquema actual no define tabla de decisiones humanas.

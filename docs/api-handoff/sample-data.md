@@ -55,6 +55,20 @@ Los ejemplos son simulados pero respetan nombres de columnas y tipos del esquema
 ]
 ```
 
+## Ejemplo de fila de `parties`
+
+```json
+{
+  "party_key": "pp",
+  "party_name": "Partido Popular",
+  "short_name": "PP",
+  "territory_code": "ES",
+  "color_hex": "#1d84ce",
+  "display_order": 20,
+  "is_active": true
+}
+```
+
 ## Respuesta esperada para `/api/v1/polls`
 
 ```json
@@ -107,10 +121,10 @@ Los ejemplos son simulados pero respetan nombres de columnas y tipos del esquema
   "identity_status": "exact",
   "is_active": true,
   "results": [
-    { "party_key": "pp", "party_raw": "PP", "vote_share": 32.4, "seats_min": null, "seats_max": null },
-    { "party_key": "psoe", "party_raw": "PSOE", "vote_share": 27.9, "seats_min": null, "seats_max": null },
-    { "party_key": "vox", "party_raw": "Vox", "vote_share": 15.1, "seats_min": null, "seats_max": null },
-    { "party_key": "sumar", "party_raw": "Sumar", "vote_share": 10.6, "seats_min": null, "seats_max": null }
+    { "party_key": "pp", "party_raw": "PP", "party_name": "Partido Popular", "short_name": "PP", "color_hex": "#1d84ce", "vote_share": 32.4, "seats_min": null, "seats_max": null },
+    { "party_key": "psoe", "party_raw": "PSOE", "party_name": "Partido Socialista Obrero Espanol", "short_name": "PSOE", "color_hex": "#e30613", "vote_share": 27.9, "seats_min": null, "seats_max": null },
+    { "party_key": "vox", "party_raw": "Vox", "party_name": "Vox", "short_name": "Vox", "color_hex": "#63be21", "vote_share": 15.1, "seats_min": null, "seats_max": null },
+    { "party_key": "sumar", "party_raw": "Sumar", "party_name": "Sumar", "short_name": "Sumar", "color_hex": "#e51b7e", "vote_share": 10.6, "seats_min": null, "seats_max": null }
   ]
 }
 ```
@@ -125,6 +139,9 @@ Los ejemplos son simulados pero respetan nombres de columnas y tipos del esquema
       "date": "2026-06-01",
       "party_key": "pp",
       "party_raw": "PP",
+      "party_name": "Partido Popular",
+      "short_name": "PP",
+      "color_hex": "#1d84ce",
       "vote_share": 32.4,
       "seats_min": null,
       "seats_max": null,
@@ -138,6 +155,9 @@ Los ejemplos son simulados pero respetan nombres de columnas y tipos del esquema
       "date": "2026-06-01",
       "party_key": "psoe",
       "party_raw": "PSOE",
+      "party_name": "Partido Socialista Obrero Espanol",
+      "short_name": "PSOE",
+      "color_hex": "#e30613",
       "vote_share": 27.9,
       "seats_min": null,
       "seats_max": null,

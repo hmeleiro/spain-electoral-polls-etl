@@ -86,15 +86,15 @@ Si `active_only=true`, contar solo `polls.is_active = true` y no `manual_review`
 ## GET /api/v1/parties
 
 ### Proposito
-Listar partidos disponibles derivados de resultados.
+Listar el catalogo canonico de partidos.
 ### Query params
-`election_key`, `active_only=true`, `limit`, `offset`.
+`territory_code`, `active_only=true`, `limit`, `offset`.
 ### Respuesta JSON esperada
 ```json
 {
   "items": [
-    { "party_key": "pp", "party_raw": "PP", "poll_count": 42 },
-    { "party_key": "psoe", "party_raw": "PSOE", "poll_count": 42 }
+    { "party_key": "pp", "party_name": "Partido Popular", "short_name": "PP", "territory_code": "ES", "color_hex": "#1d84ce", "display_order": 20 },
+    { "party_key": "psoe", "party_name": "Partido Socialista Obrero Espanol", "short_name": "PSOE", "territory_code": "ES", "color_hex": "#e30613", "display_order": 10 }
   ],
   "limit": 100,
   "offset": 0,
@@ -102,9 +102,9 @@ Listar partidos disponibles derivados de resultados.
 }
 ```
 ### Tablas consultadas
-`poll_results`, `polls`, `elections`.
+`parties`.
 ### Reglas de negocio aplicables
-No hay tabla `parties`; deduplicar por `party_key`.
+Ordenar por `display_order`, `party_key`. Si `active_only=true`, aplicar `parties.is_active = true`.
 
 ## GET /api/v1/polls
 
@@ -141,7 +141,7 @@ Listar encuestas paginadas.
 }
 ```
 ### Tablas consultadas
-`polls`, `pollsters`, `elections`.
+Preferentemente `api_polls_public`; usar tablas base solo si se solicitan `include_manual_review` o `include_inactive`.
 ### Reglas de negocio aplicables
 Excluir por defecto `is_active = false` y `manual_review`.
 
@@ -230,7 +230,7 @@ Consultar resultados long con filtros.
 }
 ```
 ### Tablas consultadas
-`poll_results`, `polls`, `pollsters`, `elections`.
+Preferentemente `api_poll_results_public`; usar tablas base solo si se solicitan `include_manual_review` o `include_inactive`.
 ### Reglas de negocio aplicables
 Formato long; filtrar en SQL.
 
@@ -259,7 +259,7 @@ Serie temporal optimizada para dashboard.
 }
 ```
 ### Tablas consultadas
-`polls`, `poll_results`, `pollsters`, `elections`.
+Preferentemente `api_poll_results_public`; usar tablas base solo si se solicitan `include_manual_review` o `include_inactive`.
 ### Reglas de negocio aplicables
 `date_field=auto` usa `coalesce(fieldwork_end, publication_date)`. Para dashboards orientados a publicacion, el cliente debe pedir explicitamente `date_field=publication_date`.
 
@@ -319,14 +319,39 @@ Admin protegido; cuidado con `error_message`.
 ## GET /api/v1/admin/manual-review
 
 ### Proposito
-Listar encuestas que requieren revision manual.
+Listar la bandeja visual de encuestas que requieren revision manual o presentan anomalias.
 ### Query params
-`election_key`, `page_key`, `limit`, `offset`.
+`election_key`, `page_key`, `review_status=pending|needs_fix|reviewed|rejected`, `limit`, `offset`.
+### Validacion
+`limit` entre `1` y `1000`; `offset >= 0`; `review_status` solo admite `pending`, `needs_fix`, `reviewed`, `rejected`.
 ### Respuesta JSON esperada
 ```json
 {
   "items": [
-    { "id": 202, "election_key": "congreso_espana_2027", "pollster_name": "Example Pollster", "identity_status": "manual_review", "identity_confidence": 0.76, "is_active": true }
+    {
+      "poll_id": 202,
+      "election_key": "congreso_espana_2027",
+      "territory_code": "ES",
+      "pollster_name": "Example Pollster",
+      "media": "Example Media",
+      "fieldwork_start": "2026-06-01",
+      "fieldwork_end": "2026-06-05",
+      "publication_date": "2026-06-06",
+      "sample_size": 1200,
+      "source_url": "https://example.com/poll",
+      "identity_status": "manual_review",
+      "identity_confidence": 0.76,
+      "result_count": 8,
+      "vote_share_sum": 92.4,
+      "anomaly_count": 2,
+      "error_count": 0,
+      "warning_count": 2,
+      "review_status": "pending",
+      "review_priority": 80,
+      "anomalies": [
+        { "severity": "warning", "code": "manual_review_status", "message": "La encuesta esta marcada para revision manual." }
+      ]
+    }
   ],
   "limit": 100,
   "offset": 0,
@@ -334,9 +359,109 @@ Listar encuestas que requieren revision manual.
 }
 ```
 ### Tablas consultadas
-`polls`, `pollsters`, `elections`.
+Preferentemente `admin_poll_review_queue`.
 ### Reglas de negocio aplicables
-Admin/debug; puede exponer `identity_confidence`, no `row_hash`.
+Admin protegido. Ordenar por `review_priority desc` y fecha reciente. Esta respuesta esta pensada para una bandeja visual, no para API publica.
+### Notas de implementacion
+Calcular `total` con los mismos filtros antes de aplicar `limit/offset`. El parametro `page_key` filtra la columna `wiki_page`.
+
+## GET /api/v1/admin/manual-review/{poll_id}
+
+### Proposito
+Obtener la ficha completa de revision visual de una encuesta.
+### Query params
+Ninguno.
+### Respuesta JSON esperada
+```json
+{
+  "poll_id": 202,
+  "election_key": "congreso_espana_2027",
+  "pollster_name": "Example Pollster",
+  "media": "Example Media",
+  "fieldwork_start": "2026-06-01",
+  "fieldwork_end": "2026-06-05",
+  "publication_date": "2026-06-06",
+  "sample_size": 1200,
+  "source_url": "https://example.com/poll",
+  "source_title": "Example poll headline",
+  "identity_status": "manual_review",
+  "identity_confidence": 0.76,
+  "vote_share_sum": 92.4,
+  "anomalies": [
+    { "severity": "warning", "code": "low_identity_confidence", "message": "La confianza del matching esta por debajo de 0.85." }
+  ],
+  "results": [
+    {
+      "party_key": "pp",
+      "short_name": "PP",
+      "color_hex": "#1d84ce",
+      "vote_share": 32.4,
+      "recent_average_vote_share": 31.1,
+      "delta_from_recent_average": 1.3,
+      "is_unknown_party": false,
+      "raw_value": "32.4"
+    }
+  ],
+  "match_candidates": [
+    {
+      "candidate_poll_id": 184,
+      "rank": 1,
+      "confidence": 0.82,
+      "reasons": ["same_election", "same_pollster", "same_media", "identical_vote_results"],
+      "pollster_name": "40dB",
+      "media": "El Pais",
+      "fieldwork_start": "2026-05-28",
+      "fieldwork_end": "2026-06-02",
+      "publication_date": "2026-06-03",
+      "sample_size": 1200,
+      "source_url": "https://example.com/previous",
+      "identity_status": "probable_match",
+      "vote_share_sum": 92.1,
+      "results": [
+        { "party_key": "pp", "party_raw": "PP", "vote_share": 32.8 },
+        { "party_key": "psoe", "party_raw": "PSOE", "vote_share": 28.9 }
+      ]
+    }
+  ],
+  "latest_identity_event_reasons": ["ambiguous_or_low_confidence", "same_pollster"]
+}
+```
+### Tablas consultadas
+Preferentemente `admin_poll_review_detail`.
+### Reglas de negocio aplicables
+Admin protegido. Puede exponer `source_metadata`, `latest_payload_json`, `raw_value` y razones de matching porque es una pantalla operativa.
+### Notas de implementacion
+Devolver `404` si `poll_id` no existe. Los campos JSONB como `anomalies`, `results`, `match_candidates`, `source_metadata`, `source_reference_ids`, `latest_identity_event_reasons` y `latest_payload_json` deben salir como JSON nativo, no como strings.
+
+## POST /api/v1/admin/manual-review/{poll_id}/actions
+
+### Proposito
+Registrar una decision de revision y actualizar la visibilidad de la encuesta cuando proceda.
+### Body JSON esperado
+```json
+{
+  "action": "approved_new_poll",
+  "reviewer": "admin@example.com",
+  "notes": "La fila coincide con la fuente.",
+  "corrected_payload": {}
+}
+```
+### Validacion
+`action` debe ser uno de `approved_new_poll`, `approved_match`, `rejected`, `needs_fix`, `comment`. `corrected_payload` debe tratarse como objeto JSON; si falta, usar `{}`.
+### Respuesta JSON esperada
+```json
+{
+  "poll_id": 202,
+  "review_action_id": 77,
+  "action": "approved_new_poll"
+}
+```
+### Tablas consultadas/modificadas
+`poll_review_actions`, `polls`, `poll_identity_events`.
+### Reglas de negocio aplicables
+Acciones validas: `approved_new_poll`, `approved_match`, `rejected`, `needs_fix`, `comment`. `approved_new_poll` cambia `identity_status` a `new_poll`; `approved_match` lo cambia a `probable_match`; `rejected` mantiene `manual_review` y pone `is_active=false`; `needs_fix` mantiene `manual_review`.
+### Notas de implementacion
+Debe ejecutarse en transaccion. Bloquear `polls` con `for update`, insertar `poll_review_actions`, actualizar `polls` si procede e insertar `poll_identity_events` con `event_type = 'manual_review_' || action`. Devolver `404` si `poll_id` no existe.
 
 ## GET /api/v1/admin/poll-versions/{poll_id}
 

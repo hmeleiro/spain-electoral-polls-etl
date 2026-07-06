@@ -26,6 +26,7 @@ source_project_r_files <- function(root = getwd()) {
     "R/wiki_parse.R",
     "R/db_connect.R",
     "R/db_upsert.R",
+    "R/manual_review.R",
     "R/run_pipeline.R"
   )
   for (file in files) {
@@ -45,23 +46,31 @@ page_registry <- function() {
   data.frame(
     page_key = c(
       "next_spanish_general_election",
-      "spanish_general_election_2023"
+      "spanish_general_election_2023",
+      "spanish_general_election_2023_2022",
+      "spanish_general_election_2023_2019_2021"
     ),
     page_title = c(
       "Opinion polling for the next Spanish general election",
-      "Opinion polling for the 2023 Spanish general election"
+      "Opinion polling for the 2023 Spanish general election",
+      "Nationwide opinion polling for the 2023 Spanish general election (2022)",
+      "Nationwide opinion polling for the 2023 Spanish general election (2019\u20132021)"
     ),
     url = c(
       "https://en.wikipedia.org/wiki/Opinion_polling_for_the_next_Spanish_general_election",
-      "https://en.wikipedia.org/wiki/Opinion_polling_for_the_2023_Spanish_general_election"
+      "https://en.wikipedia.org/wiki/Opinion_polling_for_the_2023_Spanish_general_election",
+      "https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2023_Spanish_general_election_(2022)",
+      "https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2023_Spanish_general_election_(2019%E2%80%932021)"
     ),
     election_key = c(
       "congreso_espana_2027",
+      "congreso_espana_2023",
+      "congreso_espana_2023",
       "congreso_espana_2023"
     ),
-    territory_code = c("ES", "ES"),
-    default_year = c(2026L, 2023L),
-    election_date = as.Date(c(NA, "2023-07-23")),
+    territory_code = c("ES", "ES", "ES", "ES"),
+    default_year = c(2026L, 2023L, 2022L, 2021L),
+    election_date = as.Date(c(NA, "2023-07-23", "2023-07-23", "2023-07-23")),
     stringsAsFactors = FALSE
   )
 }

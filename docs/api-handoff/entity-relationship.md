@@ -4,7 +4,7 @@
 
 `elections` define las elecciones disponibles. Cada `wiki_pages` pertenece a una eleccion mediante `election_key` y representa una pagina Wikipedia configurada para scraping.
 
-`polls` es la entidad central. Cada encuesta pertenece a una `elections` por `election_id`, a una `pollsters` por `pollster_id`, y a una pagina fuente por `wiki_page`. Sus resultados se almacenan en `poll_results`, una fila por partido.
+`polls` es la entidad central. Cada encuesta pertenece a una `elections` por `election_id`, a una `pollsters` por `pollster_id`, y a una pagina fuente por `wiki_page`. Sus resultados se almacenan en `poll_results`, una fila por partido. `parties` cataloga nombres, colores y orden de visualizacion para claves de partido conocidas.
 
 `wiki_page_revisions` conserva snapshots de revisiones Wikipedia y permite saber si una revision ya fue procesada correctamente. `poll_versions` conserva payloads historicos de encuestas cuando cambian. `poll_identity_events` registra decisiones de matching, correcciones, ambiguedades y desactivaciones. `scraper_runs` audita cada ejecucion.
 
@@ -21,6 +21,7 @@ erDiagram
     wiki_pages ||--o{ polls : sources
     wiki_pages ||--o{ scraper_runs : scraped_by
     polls ||--o{ poll_results : contains
+    parties ||--o{ poll_results : describes
     polls ||--o{ poll_versions : has_versions
     polls ||--o{ poll_identity_events : has_events
 
@@ -37,6 +38,16 @@ erDiagram
         bigint id PK
         text pollster_name
         text pollster_key UK
+    }
+
+    parties {
+        text party_key PK
+        text party_name
+        text short_name
+        text territory_code
+        text color_hex
+        integer display_order
+        boolean is_active
     }
 
     polls {

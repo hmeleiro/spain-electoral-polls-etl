@@ -29,9 +29,13 @@ renv/sandbox/
 .cache/
 cache/
 
+# Frontend artifacts
+node_modules/
+admin-ui/node_modules/
+admin-ui/dist/
+
 # OS and editor files
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
-

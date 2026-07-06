@@ -302,6 +302,72 @@ extract_row_values <- function(row_node, expected_cols) {
   values
 }
 
+cell_span <- function(cell_node, attr_name) {
+  value <- suppressWarnings(as.integer(xml2::xml_attr(cell_node, attr_name)))
+  if (is.na(value) || value < 1) {
+    return(1L)
+  }
+  value
+}
+
+extract_expanded_row_values <- function(row_nodes, expected_cols) {
+  active_spans <- vector("list", expected_cols)
+  out <- vector("list", length(row_nodes))
+
+  for (i in seq_along(row_nodes)) {
+    row_node <- row_nodes[[i]]
+    cells <- xml2::xml_find_all(row_node, "./td")
+    values <- rep(NA_character_, expected_cols)
+    col <- 1L
+
+    for (cell in cells) {
+      while (col <= expected_cols && !is.null(active_spans[[col]])) {
+        values[[col]] <- active_spans[[col]]$value
+        active_spans[[col]]$remaining <- active_spans[[col]]$remaining - 1L
+        if (active_spans[[col]]$remaining <= 0L) {
+          active_spans[col] <- list(NULL)
+        }
+        col <- col + 1L
+      }
+      if (col > expected_cols) {
+        break
+      }
+
+      value <- cell_text_preserving_breaks(cell)
+      colspan <- cell_span(cell, "colspan")
+      rowspan <- cell_span(cell, "rowspan")
+      for (offset in seq_len(colspan)) {
+        target_col <- col + offset - 1L
+        if (target_col > expected_cols) {
+          next
+        }
+        values[[target_col]] <- value
+        if (rowspan > 1L) {
+          active_spans[[target_col]] <- list(value = value, remaining = rowspan - 1L)
+        }
+      }
+      col <- col + colspan
+    }
+
+    while (col <= expected_cols && !is.null(active_spans[[col]])) {
+      values[[col]] <- active_spans[[col]]$value
+      active_spans[[col]]$remaining <- active_spans[[col]]$remaining - 1L
+      if (active_spans[[col]]$remaining <= 0L) {
+        active_spans[col] <- list(NULL)
+      }
+      col <- col + 1L
+    }
+
+    if (any(is.na(values))) {
+      out[[i]] <- NULL
+    } else {
+      out[[i]] <- values
+    }
+  }
+
+  out
+}
+
 is_non_poll_row <- function(row) {
   pollster_key <- normalize_text(row$pollster %||% "")
   fieldwork_key <- normalize_text(row$fieldwork %||% "")
@@ -371,9 +437,10 @@ parse_poll_table <- function(table_node, year, wiki_page, wiki_revision_id, refe
   }
 
   row_nodes <- xml2::xml_find_all(table_node, ".//tr[td]")
+  expanded_rows <- extract_expanded_row_values(row_nodes, length(normalized_names))
   records <- list()
   for (i in seq_along(row_nodes)) {
-    row_values <- extract_row_values(row_nodes[[i]], length(normalized_names))
+    row_values <- expanded_rows[[i]] %||% extract_row_values(row_nodes[[i]], length(normalized_names))
     if (is.null(row_values)) {
       if (i > nrow(table)) {
         next
@@ -430,7 +497,7 @@ parse_wiki_poll_html <- function(
   reference_map <- build_reference_map(doc)
   nodes <- xml2::xml_find_all(doc, "//*[self::h2 or self::h3 or self::h4 or self::h5 or self::table]")
 
-  in_voting_estimates <- FALSE
+  in_poll_section <- FALSE
   current_year <- as.integer(default_year)
   records <- list()
 
@@ -439,21 +506,21 @@ parse_wiki_poll_html <- function(
     text <- clean_wiki_text(xml2::xml_text(node))
 
     if (node_name %in% c("h2", "h3", "h4", "h5")) {
-      if (grepl("Voting intention estimates", text, ignore.case = TRUE)) {
-        in_voting_estimates <- TRUE
+      if (grepl("^(Voting intention estimates|Polling)$", text, ignore.case = TRUE)) {
+        in_poll_section <- TRUE
         next
       }
-      if (in_voting_estimates && grepl("Voting preferences|Hypothetical|Sub-national|Leadership|Notes|References", text, ignore.case = TRUE)) {
-        in_voting_estimates <- FALSE
+      if (in_poll_section && grepl("Voting preferences|Hypothetical|Sub-national|Leadership|Notes|References", text, ignore.case = TRUE)) {
+        in_poll_section <- FALSE
       }
       year <- heading_year(text)
-      if (in_voting_estimates && !is.na(year)) {
+      if (in_poll_section && !is.na(year)) {
         current_year <- year
       }
       next
     }
 
-    if (node_name == "table" && in_voting_estimates) {
+    if (node_name == "table" && in_poll_section) {
       table_year <- if (!is.na(current_year)) current_year else as.integer(default_year)
       if (is.na(table_year)) {
         next

@@ -32,10 +32,9 @@ Run migrations in order:
 ```sh
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/001_schema.sql
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/002_indexes.sql
-psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/003_publication_sources.sql
 ```
 
-The schema includes `wiki_pages`, `wiki_page_revisions`, `elections`, `pollsters`, `polls`, `poll_results`, `poll_versions`, `poll_identity_events`, and `scraper_runs`. It seeds the MVP election `congreso_espana_2027` and the Wikipedia page `next_spanish_general_election`.
+The schema includes `wiki_pages`, `wiki_page_revisions`, `elections`, `pollsters`, `parties`, `polls`, `poll_results`, `poll_versions`, `poll_identity_events`, `scraper_runs`, and `poll_review_actions`. It also creates public API helper views: `api_polls_public` and `api_poll_results_public`, plus admin review views for visual moderation.
 
 ## Configuration
 
@@ -60,12 +59,17 @@ Rscript scripts/run_scraper.R
 
 The default page is `next_spanish_general_election`. To scrape another registered page, set `PAGE_KEY`.
 
-PowerShell example for the 2023 general election polling page:
+PowerShell example to scrape multiple poll pages:
 
 ```powershell
+$env:PAGE_KEY = "spanish_general_election_2023_2019_2021"
+Rscript scripts/run_scraper.R
+$env:PAGE_KEY = "spanish_general_election_2023_2022"
+Rscript scripts/run_scraper.R
 $env:PAGE_KEY = "spanish_general_election_2023"
 Rscript scripts/run_scraper.R
 $env:PAGE_KEY = "next_spanish_general_election"
+Rscript scripts/run_scraper.R
 ```
 
 To reparse the current Wikipedia revision even if it was already marked as processed, for example after parser changes:
@@ -96,6 +100,18 @@ For a new revision, the scraper stores raw HTML and wikitext first. This preserv
 election_key + pollster + media + fieldwork_start + fieldwork_end + sample_size
 ```
 
+Rows with an explicit poll variant append variant metadata to the strict key. For example, Wikipedia rows labelled `CIS (Ateneo del Dato)` or `CIS (LogosLab)` with the note `Alternative projection based on raw CIS data.` are normalized as:
+
+```text
+pollster = Ateneo del Dato / LogosLab / ...
+media = CIS
+poll_variant = reestimate
+base_pollster_key = cis
+base_data_source_key = cis
+```
+
+The relationship with the source poll is stored in `source_metadata`, so the reestimate is kept as a separate poll even when it shares CIS fieldwork dates and sample size.
+
 `poll_signature` is more flexible and uses:
 
 ```text
@@ -106,7 +122,9 @@ election_key + pollster + media + sample_size + publication_date
 
 ## Flexible Matching
 
-`match_existing_poll()` first checks `poll_key_strict`. If there is no exact match, it scores candidates with fixed weights for same election, pollster, media, sample size, publication date, fieldwork dates, and similar vote shares.
+`match_existing_poll()` first checks `poll_key_strict`. If there is no exact match, it scores candidates with fixed weights for same election, pollster, media, sample size, publication date, fieldwork dates, and identical vote shares across the comparable party subset.
+
+Fuzzy candidates from a different pollster are capped below the candidate threshold. This prevents reestimates or other derived series from being sent to manual review just because they reuse the source poll's dates.
 
 A single candidate with confidence `>= 0.85` is a `probable_match`. Several close candidates or lower confidence are marked `manual_review`.
 
@@ -118,24 +136,43 @@ When an existing poll matches but its `row_hash` changes, the scraper updates `p
 
 Source metadata is stored on `polls` as `source_url`, `source_title`, `source_reference_ids`, and `source_metadata`. This keeps the extracted publication date auditable against the Wikipedia reference used for that row.
 
+## Public SQL Views
+
+For API and dashboard reads, prefer:
+
+```sql
+select * from api_polls_public limit 5;
+select * from api_poll_results_public limit 5;
+select * from parties order by display_order;
+```
+
+The public views already filter out inactive polls and `manual_review` rows.
+
 At the end of a successful parse, active polls from the same page and election that were not seen in the current revision are marked `is_active = false`. This is used for rows removed from Wikipedia or rows that are now filtered out, such as election-result rows. The scraper records a `poll_missing_from_revision` event instead of deleting data.
 
 ## Manual Review
 
-Ambiguous rows are inserted with `identity_status = 'manual_review'`. Review the decision trail with:
+Ambiguous rows are inserted with `identity_status = 'manual_review'`. For visual admin review, use:
 
 ```sql
-select *
-from poll_identity_events
-where event_type = 'manual_review'
-order by created_at desc;
+select * from admin_poll_review_queue limit 50;
+select * from admin_poll_review_detail where poll_id = 202;
+select * from admin_poll_review_results where poll_id = 202;
 ```
 
-After review, update the affected `polls` row and preserve notes externally or through an additional operational table in a future migration.
+`admin_poll_review_queue` is designed for a review inbox. It includes priority, latest review status, anomaly counts, vote-share sum, source labels, matching confidence, and a JSON `anomalies` array that can be rendered as badges.
 
-## GitHub Actions
+`admin_poll_review_detail` is designed for the poll detail screen. It includes metadata, source audit fields, latest matching event, latest normalized payload, anomaly JSON, and result JSON. `admin_poll_review_results` provides one row per party with party colors and deltas against recent comparable polls.
 
-`.github/workflows/scrape-polls.yml` runs twice daily and supports manual `workflow_dispatch`. Configure the PostgreSQL and Wikipedia user-agent values as GitHub Secrets.
+Review decisions are persisted in `poll_review_actions`. From R, use:
+
+```r
+queue <- list_manual_review_polls(con, limit = 50)
+poll <- get_manual_review_poll(con, poll_id = 202)
+record_poll_review_decision(con, 202, "approved_new_poll", reviewer = "admin@example.com")
+```
+
+Supported actions are `approved_new_poll`, `approved_match`, `rejected`, `needs_fix`, and `comment`.
 
 ## Tests
 
@@ -149,6 +186,5 @@ Tests cover normalization, date parsing, special values, key/signature/hash gene
 
 - Only national voting intention tables from the configured English Wikipedia page are supported.
 - Publication date extraction depends on Wikipedia citation metadata; when references lack dates, the scraper falls back to `fieldwork_end`.
-- Manual review workflow is auditable but intentionally minimal.
 - The parser is tolerant of moderate table changes but still expects recognizable polling, fieldwork, sample, turnout, party, and lead headers.
 - PostgreSQL integration requires a reachable database and installed `RPostgres`.

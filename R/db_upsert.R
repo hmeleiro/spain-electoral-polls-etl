@@ -116,6 +116,7 @@ fetch_existing_polls <- function(con, election_id, wiki_page) {
        p.poll_signature,
        e.election_key,
        ps.pollster_key,
+       ps.pollster_name,
        p.media,
        p.fieldwork_start,
        p.fieldwork_end,
@@ -128,6 +129,7 @@ fetch_existing_polls <- function(con, election_id, wiki_page) {
        p.source_reference_ids::text as source_reference_ids_json,
        p.source_metadata::text as source_metadata_json,
        p.row_hash,
+       p.identity_status,
        coalesce(
          jsonb_agg(
            jsonb_build_object(
@@ -146,7 +148,7 @@ fetch_existing_polls <- function(con, election_id, wiki_page) {
      join pollsters ps on ps.id = p.pollster_id
      left join poll_results pr on pr.poll_id = p.id
      where p.election_id = $1 and p.wiki_page = $2 and p.is_active
-     group by p.id, e.election_key, ps.pollster_key",
+     group by p.id, e.election_key, ps.pollster_key, ps.pollster_name",
     params = list(election_id, wiki_page)
   )
 
@@ -160,6 +162,83 @@ fetch_existing_polls <- function(con, election_id, wiki_page) {
   rows$source_metadata <- lapply(rows$source_metadata_json, from_json_or_null)
   rows$results <- lapply(rows$results_json, from_json_or_null)
   rows
+}
+
+candidate_snapshot <- function(candidate) {
+  results <- candidate$results %||% list()
+  vote_share_sum <- NA_real_
+  if (length(results) > 0) {
+    vote_values <- vapply(results, function(x) as.numeric(x$vote_share %||% NA_real_), numeric(1))
+    if (any(!is.na(vote_values))) {
+      vote_share_sum <- sum(vote_values, na.rm = TRUE)
+    }
+  }
+
+  list(
+    candidate_poll_id = scalar_int(candidate$id),
+    election_key = candidate$election_key %||% NA_character_,
+    pollster_key = candidate$pollster_key %||% NA_character_,
+    pollster_name = candidate$pollster_name %||% candidate$pollster_key %||% NA_character_,
+    media = candidate$media %||% NA_character_,
+    fieldwork_start = safe_date_chr(candidate$fieldwork_start),
+    fieldwork_end = safe_date_chr(candidate$fieldwork_end),
+    publication_date = safe_date_chr(candidate$publication_date),
+    sample_size = candidate$sample_size %||% NA_integer_,
+    identity_status = candidate$identity_status %||% NA_character_,
+    source_url = candidate$source_url %||% NA_character_,
+    source_title = candidate$source_title %||% NA_character_,
+    vote_share_sum = vote_share_sum,
+    results = results
+  )
+}
+
+upsert_poll_match_candidates <- function(con, poll_id, revision_id, match, existing_polls) {
+  candidates <- match$candidates %||% list()
+  revision_id <- revision_id %||% NA_integer_
+
+  DBI::dbExecute(
+    con,
+    "delete from poll_match_candidates
+     where poll_id = $1
+       and coalesce(wiki_revision_id, -1) = coalesce($2, -1)",
+    params = list(poll_id, revision_id)
+  )
+
+  if (length(candidates) == 0 || is.null(existing_polls) || nrow(existing_polls) == 0) {
+    return(invisible(0L))
+  }
+
+  inserted <- 0L
+  for (candidate in candidates) {
+    candidate_poll_id <- scalar_int(candidate$poll_id)
+    if (is.na(candidate_poll_id)) {
+      next
+    }
+    candidate_row <- existing_polls[existing_polls$id == candidate_poll_id, , drop = FALSE]
+    if (nrow(candidate_row) != 1) {
+      next
+    }
+    snapshot <- candidate_snapshot(row_to_poll_list(candidate_row))
+    DBI::dbExecute(
+      con,
+      "insert into poll_match_candidates
+         (poll_id, candidate_poll_id, wiki_revision_id, rank, confidence, reasons, candidate_snapshot, created_at)
+       values
+         ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, now())",
+      params = list(
+        poll_id,
+        candidate_poll_id,
+        revision_id,
+        candidate$rank %||% (inserted + 1L),
+        candidate$confidence %||% NA_real_,
+        as_json(as.list(candidate$reasons %||% character())),
+        as_json(snapshot)
+      )
+    )
+    inserted <- inserted + 1L
+  }
+
+  invisible(inserted)
 }
 
 latest_poll_payload <- function(con, poll_id) {
@@ -439,6 +518,7 @@ upsert_normalized_polls <- function(con, polls, page_key, revision_id) {
       seen_poll_ids <- c(seen_poll_ids, poll_id)
       insert_poll_results(con, poll_id, poll$results)
       insert_poll_version(con, poll_id, revision_id, poll$row_hash, payload)
+      upsert_poll_match_candidates(con, poll_id, revision_id, match, existing)
       insert_identity_event(con, poll_id, revision_id, status, NULL, payload, match$confidence, match$reasons)
       if (status == "manual_review") {
         stats$polls_manual_review <- stats$polls_manual_review + 1L
@@ -456,6 +536,7 @@ upsert_normalized_polls <- function(con, polls, page_key, revision_id) {
     }
 
     if (nrow(existing_row) == 1 && identical(existing_row$row_hash[[1]], poll$row_hash)) {
+      upsert_poll_match_candidates(con, match$poll_id, revision_id, match, existing)
       update_existing_poll(con, match$poll_id, poll, pollster_id, match$match_type, match$confidence)
       event_type <- if (match$match_type == "exact") "exact_match" else "probable_match"
       insert_identity_event(con, match$poll_id, revision_id, event_type, old_payload, payload, match$confidence, match$reasons)
@@ -463,6 +544,7 @@ upsert_normalized_polls <- function(con, polls, page_key, revision_id) {
       next
     }
 
+    upsert_poll_match_candidates(con, match$poll_id, revision_id, match, existing)
     update_existing_poll(con, match$poll_id, poll, pollster_id, match$match_type, match$confidence)
     insert_poll_results(con, match$poll_id, poll$results)
     insert_poll_version(con, match$poll_id, revision_id, poll$row_hash, payload)

@@ -6,7 +6,6 @@ La base de datos esperada se llama `spainelectoralpollsdb`. Las fuentes de verda
 
 - `sql/001_schema.sql`
 - `sql/002_indexes.sql`
-- `sql/003_publication_sources.sql`
 
 ## Documentos incluidos
 
@@ -16,6 +15,7 @@ La base de datos esperada se llama `spainelectoralpollsdb`. Las fuentes de verda
 - `business-rules.md`: reglas de negocio que la API debe respetar.
 - `api-use-cases.md`: casos de uso esperados del dashboard y de endpoints administrativos.
 - `api-contract-draft.md`: contrato inicial sugerido para FastAPI.
+- `admin-ui-endpoints-implementation-prompt.md`: prompt listo para implementar los endpoints consumidos por el Admin UI.
 - `sample-data.md`: filas y respuestas JSON realistas.
 - `implementation-notes.md`: notas tecnicas para implementar la API.
 
@@ -27,8 +27,9 @@ La base de datos esperada se llama `spainelectoralpollsdb`. Las fuentes de verda
 4. `business-rules.md`
 5. `api-use-cases.md`
 6. `api-contract-draft.md`
-7. `sample-data.md`
-8. `implementation-notes.md`
+7. `admin-ui-endpoints-implementation-prompt.md`
+8. `sample-data.md`
+9. `implementation-notes.md`
 
 ## Partes del ETL relevantes para la API
 
@@ -55,3 +56,5 @@ No expongas en endpoints publicos:
 La API publica debe consultar principalmente `elections`, `pollsters`, `polls` y `poll_results`, aplicando por defecto `polls.is_active = true` y `polls.identity_status <> 'manual_review'`.
 
 El ETL ya tiene configuradas al menos dos paginas nacionales: `next_spanish_general_election` y `spanish_general_election_2023`. La API no debe asumir que solo existe una eleccion o una pagina fuente.
+
+Para listados publicos, la API puede consultar directamente `api_polls_public` y `api_poll_results_public`. Estas vistas ya aplican los filtros publicos por defecto.

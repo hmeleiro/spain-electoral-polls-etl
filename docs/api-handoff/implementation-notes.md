@@ -4,8 +4,11 @@
 
 Consultar normalmente:
 
+- `api_polls_public`
+- `api_poll_results_public`
 - `elections`
 - `pollsters`
+- `parties`
 - `polls`
 - `poll_results`
 
@@ -16,6 +19,35 @@ Consultar normalmente:
 - `poll_versions`
 - `poll_identity_events`
 - `scraper_runs`
+- `poll_review_actions`
+
+## Vistas para revision visual admin
+
+Consultar normalmente:
+
+- `admin_poll_review_queue`
+- `admin_poll_review_detail`
+- `admin_poll_review_results`
+- `admin_poll_review_anomalies`
+- `admin_poll_review_match_candidates`
+
+## Endpoints requeridos por el Admin UI
+
+El frontend `admin-ui/` consume exactamente:
+
+- `GET /api/v1/admin/manual-review`
+- `GET /api/v1/admin/manual-review/{poll_id}`
+- `POST /api/v1/admin/manual-review/{poll_id}/actions`
+
+El cliente esta en `admin-ui/src/api.ts` y espera JSON con nombres `snake_case`. No convertir a `camelCase`.
+
+En desarrollo, si frontend y API corren en puertos distintos, habilitar CORS para:
+
+```text
+http://127.0.0.1:5173
+```
+
+Tambien puede usarse `VITE_API_BASE_URL` en `admin-ui/.env` para apuntar al host real de la API.
 
 ## Campos que no debe exponer la API publica
 
@@ -37,18 +69,13 @@ Consultar normalmente:
 Listado de encuestas:
 
 ```sql
-from polls p
-join elections e on e.id = p.election_id
-join pollsters ps on ps.id = p.pollster_id
+from api_polls_public
 ```
 
 Resultados long:
 
 ```sql
-from poll_results pr
-join polls p on p.id = pr.poll_id
-join elections e on e.id = p.election_id
-join pollsters ps on ps.id = p.pollster_id
+from api_poll_results_public
 ```
 
 Ficha completa:
@@ -58,6 +85,7 @@ from polls p
 join elections e on e.id = p.election_id
 join pollsters ps on ps.id = p.pollster_id
 left join poll_results pr on pr.poll_id = p.id
+left join parties pa on pa.party_key = pr.party_key
 where p.id = $1
 ```
 
@@ -94,6 +122,45 @@ p.identity_status <> 'manual_review'
 ```
 
 Solo incluirlo si el cliente envia `include_manual_review=true` o si se consulta un endpoint administrativo.
+
+Para pantallas admin, preferir `admin_poll_review_queue` como bandeja y `admin_poll_review_detail` como ficha. Las decisiones deben registrarse en `poll_review_actions` y reflejarse en `poll_identity_events` para mantener auditoria tecnica y operativa.
+
+`admin_poll_review_detail` incluye `match_candidates`, un array JSON con las encuestas existentes que el ETL considero parecidas durante el matching. La API debe devolverlo como array JSON nativo para que el Admin UI pueda cotejar si la encuesta en revision es nueva o corresponde a una encuesta ya registrada.
+
+## Como implementar acciones de revision
+
+Las acciones validas son:
+
+- `approved_new_poll`
+- `approved_match`
+- `rejected`
+- `needs_fix`
+- `comment`
+
+Mapeo de accion a efecto:
+
+| Accion | `polls.identity_status` | `polls.is_active` |
+|---|---|---|
+| `approved_new_poll` | `new_poll` | `true` |
+| `approved_match` | `probable_match` | `true` |
+| `rejected` | `manual_review` | `false` |
+| `needs_fix` | `manual_review` | sin cambio |
+| `comment` | sin cambio | sin cambio |
+
+Implementar `POST /api/v1/admin/manual-review/{poll_id}/actions` siempre dentro de una transaccion:
+
+1. Bloquear `polls` con `for update`.
+2. Insertar `poll_review_actions`.
+3. Actualizar `polls` si la accion lo requiere.
+4. Insertar `poll_identity_events` con `event_type = 'manual_review_' || action`.
+
+La respuesta minima esperada por el Admin UI es:
+
+```json
+{ "poll_id": 202, "review_action_id": 77, "action": "approved_new_poll" }
+```
+
+Si `poll_id` no existe, devolver `404`. Si `action` no es valida, devolver error de validacion.
 
 ## Como tratar `is_active`
 
@@ -132,12 +199,10 @@ Reservar para admin/debug:
 
 - `/api/v1/timeseries` con muchos partidos y rangos largos.
 - `/api/v1/results` si se usa como descarga masiva.
-- `/api/v1/parties` si se calcula agregando todo el historico repetidamente.
 - Endpoints admin de `poll_versions` si `payload_json` crece.
 
 ## Decisiones abiertas
 
-- Tabla canonica de partidos y colores.
 - Persistir `media_key`.
 - Autenticacion y autorizacion para `/admin`.
 - Politica exacta de exposicion de `identity_status`.
@@ -147,7 +212,7 @@ Reservar para admin/debug:
 
 - No asumir que `publication_date` coincide con `fieldwork_end`.
 - No asumir que solo existe una pagina/election: ya hay fuentes para `next_spanish_general_election` y `spanish_general_election_2023`.
-- No asumir que existe una tabla `parties`.
+- No asumir que todos los `poll_results.party_key` existen en `parties`; el join debe ser `left join`.
 - No asumir que existe una columna `media_key`.
 - No asumir que `wiki_revision_id` tiene FK a `wiki_page_revisions`.
 - No asumir que `manual_review` es apto para dashboard publico.
@@ -156,7 +221,8 @@ Reservar para admin/debug:
 
 ## Checklist para el agente de la API
 
-- Revisar `sql/001_schema.sql`, `sql/002_indexes.sql` y `sql/003_publication_sources.sql`.
+- Revisar `sql/001_schema.sql` y `sql/002_indexes.sql`.
+- Revisar `admin-ui/src/api.ts` y `admin-ui/src/types.ts` antes de implementar endpoints admin.
 - Implementar paginacion con `limit`, `offset`, `total`.
 - Aplicar por defecto `is_active = true`.
 - Excluir por defecto `identity_status = 'manual_review'`.
@@ -167,3 +233,5 @@ Reservar para admin/debug:
 - No exponer hashes, firmas ni payloads internos en endpoints publicos.
 - Filtrar en SQL, no en memoria.
 - Proteger o posponer endpoints `/admin`.
+- Para endpoints del Admin UI, usar `admin_poll_review_queue` y `admin_poll_review_detail`.
+- Para decisiones admin, registrar siempre `poll_review_actions` y `poll_identity_events`.

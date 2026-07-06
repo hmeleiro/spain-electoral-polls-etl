@@ -312,8 +312,68 @@ split_pollster_media <- function(x) {
   list(pollster = value, media = NA_character_)
 }
 
+metadata_text <- function(metadata) {
+  if (is.null(metadata) || length(metadata) == 0) {
+    return("")
+  }
+  values <- unlist(metadata, use.names = FALSE)
+  values <- values[!is.na(values)]
+  paste(as.character(values), collapse = " ")
+}
+
+alternative_projection_base_key <- function(record) {
+  note_text <- normalize_text(paste(
+    record$notes %||% "",
+    record$source_title %||% "",
+    metadata_text(record$source_metadata %||% list()),
+    collapse = " "
+  ))
+  match <- regexec("alternative projection based on raw ([a-z0-9 ]+) data", note_text, perl = TRUE)
+  parts <- regmatches(note_text, match)[[1]]
+  if (length(parts) < 2 || is_blank(parts[[2]])) {
+    return(NA_character_)
+  }
+  slug_key(parts[[2]])
+}
+
+is_alternative_projection_reestimate <- function(record, pollster_media) {
+  if (is_blank(pollster_media$media)) {
+    return(FALSE)
+  }
+  base_key <- alternative_projection_base_key(record)
+  !is.na(base_key) && identical(normalize_pollster(pollster_media$pollster), base_key)
+}
+
+apply_pollster_media_overrides <- function(record, pollster_media) {
+  if (is_alternative_projection_reestimate(record, pollster_media)) {
+    base_pollster <- clean_wiki_text(pollster_media$pollster)
+    base_pollster_key <- normalize_pollster(base_pollster)
+    estimator <- clean_wiki_text(pollster_media$media)
+    return(list(
+      pollster = estimator,
+      media = base_pollster,
+      estimate_type = "reestimate",
+      base_pollster = base_pollster,
+      base_pollster_key = base_pollster_key,
+      base_data_source = base_pollster,
+      base_data_source_key = base_pollster_key,
+      estimate_note = paste0("Alternative projection based on raw ", base_pollster, " data.")
+    ))
+  }
+
+  c(pollster_media, list(
+    estimate_type = NA_character_,
+    base_pollster = NA_character_,
+    base_pollster_key = NA_character_,
+    base_data_source = NA_character_,
+    base_data_source_key = NA_character_,
+    estimate_note = NA_character_
+  ))
+}
+
 normalize_poll_record <- function(record, election_key = "congreso_espana_2027") {
   pollster_media <- split_pollster_media(record$pollster_raw)
+  pollster_media <- apply_pollster_media_overrides(record, pollster_media)
   dates <- parse_fieldwork_date(record$fieldwork_raw, record$year)
   publication_date <- parse_publication_date(record$publication_date_raw %||% NA_character_, fallback_year = record$year)
   if (is.na(publication_date)) {
@@ -330,6 +390,15 @@ normalize_poll_record <- function(record, election_key = "congreso_espana_2027")
       raw_value = parsed$raw_value
     )
   })
+  source_metadata <- record$source_metadata %||% list()
+  if (!is.na(pollster_media$estimate_type)) {
+    source_metadata$estimate_type <- pollster_media$estimate_type
+    source_metadata$base_pollster <- pollster_media$base_pollster
+    source_metadata$base_pollster_key <- pollster_media$base_pollster_key
+    source_metadata$base_data_source <- pollster_media$base_data_source
+    source_metadata$base_data_source_key <- pollster_media$base_data_source_key
+    source_metadata$estimate_note <- pollster_media$estimate_note
+  }
 
   poll <- list(
     election_key = election_key,
@@ -349,8 +418,11 @@ normalize_poll_record <- function(record, election_key = "congreso_espana_2027")
     source_url = record$source_url %||% NA_character_,
     source_title = record$source_title %||% NA_character_,
     source_reference_ids = record$source_reference_ids %||% character(),
-    source_metadata = record$source_metadata %||% list(),
-    notes = record$notes %||% NA_character_,
+    source_metadata = source_metadata,
+    notes = ifelse(is_blank(record$notes %||% NA_character_), pollster_media$estimate_note, record$notes),
+    poll_variant = pollster_media$estimate_type,
+    base_pollster_key = pollster_media$base_pollster_key,
+    base_data_source_key = pollster_media$base_data_source_key,
     year = as.integer(record$year),
     row_number = record$row_number %||% NA_integer_,
     results = results

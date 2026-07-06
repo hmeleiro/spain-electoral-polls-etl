@@ -51,6 +51,19 @@ Valores de `Uso API`: `public`, `internal`, `admin`, `debug`, `do_not_expose`.
 | `pollster_key` | `text` | no | Clave normalizada unica. | public | Ejemplo: `40db`. |
 | `created_at` | `timestamptz` | no | Alta del registro. | admin |  |
 
+## `parties`
+
+| Columna | Tipo | Nullable | Descripcion | Uso API | Notas |
+|---|---|---:|---|---|---|
+| `party_key` | `text` | no | Clave canonica del partido. | public | Coincide con `poll_results.party_key` cuando esta catalogado. |
+| `party_name` | `text` | no | Nombre completo canonico. | public | Ejemplo: `Partido Popular`. |
+| `short_name` | `text` | no | Nombre corto para UI. | public | Ejemplo: `PP`. |
+| `territory_code` | `text` | no | Territorio principal del partido. | public | Ejemplo: `ES`, `ES-CT`. |
+| `color_hex` | `text` | si | Color sugerido para visualizaciones. | public | Puede ser null. |
+| `display_order` | `integer` | si | Orden recomendado de visualizacion. | public | Orden ascendente. |
+| `is_active` | `boolean` | no | Si el partido esta activo en el catalogo. | public | No filtra resultados historicos automaticamente. |
+| `created_at` | `timestamptz` | no | Alta del registro. | admin |  |
+
 ## `polls`
 
 | Columna | Tipo | Nullable | Descripcion | Uso API | Notas |
@@ -135,3 +148,59 @@ Valores de `Uso API`: `public`, `internal`, `admin`, `debug`, `do_not_expose`.
 | `polls_unchanged` | `integer` | si | Encuestas sin cambios. | admin | Default `0`. |
 | `polls_manual_review` | `integer` | si | Encuestas en revision manual. | admin | Default `0`. |
 | `error_message` | `text` | si | Error de ejecucion. | admin | Puede contener detalles internos. |
+
+## `poll_review_actions`
+
+| Columna | Tipo | Nullable | Descripcion | Uso API | Notas |
+|---|---|---:|---|---|---|
+| `id` | `bigserial` | no | Identificador de accion de revision. | admin |  |
+| `poll_id` | `bigint` | no | Encuesta revisada. | admin | FK a `polls(id)` con cascade. |
+| `action` | `text` | no | Decision registrada por administracion. | admin | `approved_new_poll`, `approved_match`, `rejected`, `needs_fix`, `comment`. |
+| `previous_identity_status` | `text` | si | Estado de identidad antes de la accion. | admin | Copia auditada desde `polls.identity_status`. |
+| `new_identity_status` | `text` | si | Estado de identidad despues de la accion. | admin | Puede ser igual al anterior para comentarios o rechazos. |
+| `reviewer` | `text` | si | Usuario/persona que revisa. | admin | Formato libre; la API puede usar email o id interno. |
+| `notes` | `text` | si | Notas internas de revision. | admin | No exponer publicamente. |
+| `corrected_payload` | `jsonb` | no | Correcciones propuestas o aplicadas desde la pantalla. | admin | Default `{}`. |
+| `created_at` | `timestamptz` | no | Momento de la accion. | admin |  |
+
+## `poll_match_candidates`
+
+| Columna | Tipo | Nullable | Descripcion | Uso API | Notas |
+|---|---|---:|---|---|---|
+| `id` | `bigserial` | no | Identificador interno del candidato. | admin |  |
+| `poll_id` | `bigint` | no | Encuesta revisada o actualizada. | admin | FK a `polls(id)`. |
+| `candidate_poll_id` | `bigint` | no | Encuesta existente considerada parecida. | admin | FK a `polls(id)`. |
+| `wiki_revision_id` | `bigint` | si | Revision en la que se calculo el matching. | admin | No tiene FK SQL. |
+| `rank` | `integer` | no | Orden del candidato por confianza. | admin | 1 es el candidato mas parecido. |
+| `confidence` | `numeric` | si | Puntuacion de matching. | admin | 0-1. |
+| `reasons` | `jsonb` | no | Razones que explican la similitud. | admin | Array JSON. |
+| `candidate_snapshot` | `jsonb` | no | Snapshot ligero del candidato en el momento del matching. | admin | Evita recalcular historico. |
+| `created_at` | `timestamptz` | no | Momento de persistencia. | admin |  |
+
+## `api_polls_public`
+
+Vista publica de encuestas activas y no ambiguas. Equivale a `polls` unido con `elections` y `pollsters`, filtrando `is_active = true` e `identity_status <> 'manual_review'`.
+
+## `api_poll_results_public`
+
+Vista publica de resultados long. Une `polls`, `poll_results`, `elections`, `pollsters` y `parties`, filtrando encuestas inactivas y `manual_review`.
+
+## `admin_poll_review_queue`
+
+Vista administrativa para la bandeja visual de revision. Incluye prioridad, estado de revision, metadatos de encuesta, fuente, confianza, suma de voto y anomalias agregadas.
+
+## `admin_poll_review_detail`
+
+Vista administrativa para la ficha visual de revision. Incluye resultados agregados, anomalias, source metadata, ultimo evento de identidad y ultimo payload normalizado.
+
+## `admin_poll_review_results`
+
+Vista administrativa long de resultados por partido. Incluye colores, indicador de partido desconocido, `raw_value` y delta frente a la media reciente.
+
+## `admin_poll_review_anomalies`
+
+Vista administrativa de anomalias por encuesta. Cada fila incluye `poll_id`, `severity`, `anomaly_code` y `message`.
+
+## `admin_poll_review_match_candidates`
+
+Vista administrativa de candidatos de matching. Expone `candidate_poll_id`, `confidence`, `reasons`, metadatos del snapshot y resultados principales para pintar el bloque `Encuestas parecidas`.
