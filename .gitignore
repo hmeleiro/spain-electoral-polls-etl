@@ -28,6 +28,8 @@ renv/sandbox/
 .testthat/
 .cache/
 cache/
+logs/*.log
+.scraper.lock
 
 # Frontend artifacts
 node_modules/

@@ -57,6 +57,16 @@ Use a descriptive `WIKI_USER_AGENT` with contact information for polite Wikipedi
 Rscript scripts/run_scraper.R
 ```
 
+Cron wrapper with daily repo-local logs:
+
+```cron
+*/10 * * * * /absolute/path/to/spain-electoral-polls/scripts/run_scraper_cron.sh
+```
+
+The wrapper writes to `logs/scraper-YYYY-MM-DD.log`, loads `.env` when present,
+starts from the repository root so `renv` is activated by `.Rprofile`, and uses
+`flock` when available to avoid overlapping scraper runs.
+
 The default page is `next_spanish_general_election`. To scrape another registered page, set `PAGE_KEY`.
 
 PowerShell example to scrape multiple poll pages:
@@ -85,6 +95,32 @@ The main function is:
 ```r
 run_poll_scraper(page_key = "next_spanish_general_election")
 ```
+
+## Deploy
+
+Pushing to GitHub deploys the ETL repository to:
+
+```text
+/home/deploy/spain-electoral-polls-etl/
+```
+
+Configure these repository secrets in GitHub Actions:
+
+```text
+DEPLOY_HOST
+DEPLOY_SSH_KEY
+```
+
+Optional secrets:
+
+```text
+DEPLOY_USER      # defaults to deploy
+DEPLOY_SSH_PORT  # defaults to 22
+```
+
+The deploy uses `rsync` over SSH, preserves runtime files such as `.env`,
+`logs/*.log`, `.scraper.lock`, and `renv/library/`, then makes
+`scripts/run_scraper_cron.sh` executable on the remote machine.
 
 ## Revision Detection
 

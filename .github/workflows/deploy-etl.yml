@@ -1,0 +1,99 @@
+name: Deploy ETL
+
+on:
+  push:
+
+concurrency:
+  group: deploy-etl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      DEPLOY_PATH: /home/deploy/spain-electoral-polls-etl/
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install deploy tools
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+        run: |
+          set -euo pipefail
+
+          DEPLOY_USER="${DEPLOY_USER:-deploy}"
+
+          if [ -z "${DEPLOY_HOST}" ] || [ -z "${DEPLOY_SSH_KEY}" ]; then
+            echo "Missing one or more required secrets: DEPLOY_HOST, DEPLOY_SSH_KEY" >&2
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          SSH_PORT="${DEPLOY_SSH_PORT:-22}"
+          ssh-keyscan -p "${SSH_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Sync repository to remote
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+        run: |
+          set -euo pipefail
+
+          DEPLOY_USER="${DEPLOY_USER:-deploy}"
+          SSH_PORT="${DEPLOY_SSH_PORT:-22}"
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${SSH_PORT} -o IdentitiesOnly=yes"
+
+          ${SSH_CMD} "${DEPLOY_USER}@${DEPLOY_HOST}" "mkdir -p '${DEPLOY_PATH}' '${DEPLOY_PATH}/logs'"
+
+          rsync -az --delete \
+            -e "${SSH_CMD}" \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.Rproj.user/' \
+            --exclude '.Rhistory' \
+            --exclude '.RData' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            --exclude '.Renviron' \
+            --exclude '.Renviron.*' \
+            --exclude '.scraper.lock' \
+            --exclude 'logs/*.log' \
+            --exclude 'renv/library/' \
+            --exclude 'renv/staging/' \
+            --exclude 'renv/sandbox/' \
+            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
+
+      - name: Prepare remote runtime
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+        run: |
+          set -euo pipefail
+
+          DEPLOY_USER="${DEPLOY_USER:-deploy}"
+          SSH_PORT="${DEPLOY_SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "${SSH_PORT}" -o IdentitiesOnly=yes "${DEPLOY_USER}@${DEPLOY_HOST}" <<'EOF'
+            set -euo pipefail
+            cd /home/deploy/spain-electoral-polls-etl/
+            mkdir -p logs
+            chmod +x scripts/run_scraper_cron.sh
+            if command -v Rscript >/dev/null 2>&1; then
+              Rscript -e "if (requireNamespace('renv', quietly = TRUE)) renv::restore(prompt = FALSE)"
+            fi
+          EOF
