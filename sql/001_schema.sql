@@ -210,7 +210,7 @@ values
   ('mas_pais', 'Mas Pais', 'MP', 'ES', '#14b8a6', 170, true),
   ('pacma', 'PACMA', 'PACMA', 'ES', '#7ac143', 180, true),
   ('adelante_andalucia', 'Adelante Andalucia', 'AA', 'ES-AN', '#00a3ad', 190, true),
-  ('salf', 'Se Acabo La Fiesta', 'SALF', 'ES', '#5bc0de', 200, true),
+  ('salf', 'Se Acabo La Fiesta', 'SALF', 'ES', '#5d6470', 200, true),
   ('alianca_cat', 'Alianca Catalana', 'AC', 'ES-CT', '#2f80ed', 210, true),
   ('te', 'Teruel Existe', 'TE', 'ES-AR', '#007B4D', 212, true),
   ('others', 'Others', 'Others', 'ES', null, 999, true)

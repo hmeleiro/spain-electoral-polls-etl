@@ -67,6 +67,20 @@ The wrapper writes to `logs/scraper-YYYY-MM-DD.log`, loads `.env` when present,
 starts from the repository root so `renv` is activated by `.Rprofile`, and uses
 `flock` when available to avoid overlapping scraper runs.
 
+When the scraper processes a new Wikipedia revision successfully, the wrapper
+can trigger the downstream poll-of-polls artifact pipeline on the same VM. Set
+this in the ETL `.env`:
+
+```text
+POLL_OF_POLLS_DATA_DIR=/absolute/path/to/poll-of-polls-data
+```
+
+If the scraper records `no_change`, the downstream pipeline is skipped. If the
+scraper succeeds with a new revision but `POLL_OF_POLLS_DATA_DIR` is missing or
+invalid, the cron wrapper exits with an error so the deployment does not silently
+fall behind. The downstream run receives a traceable `RUN_ID` in the form
+`wiki-{revision_id}-{timestamp}`.
+
 The default page is `next_spanish_general_election`. To scrape another registered page, set `PAGE_KEY`.
 
 PowerShell example to scrape multiple poll pages:
