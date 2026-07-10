@@ -63,9 +63,10 @@ Cron wrapper with daily repo-local logs:
 */10 * * * * /absolute/path/to/spain-electoral-polls/scripts/run_scraper_cron.sh
 ```
 
-The wrapper writes to `logs/scraper-YYYY-MM-DD.log`, loads `.env` when present,
-starts from the repository root so `renv` is activated by `.Rprofile`, and uses
-`flock` when available to avoid overlapping scraper runs.
+The wrapper writes to `logs/scraper-{run_id}.log`, updates `logs/latest.log`,
+loads `.env` when present, starts from the repository root so `renv` is
+activated by `.Rprofile`, and uses `flock` when available to avoid overlapping
+scraper runs.
 
 When the scraper processes a new Wikipedia revision successfully, the wrapper
 can trigger the downstream poll-of-polls artifact pipeline on the same VM. Set
