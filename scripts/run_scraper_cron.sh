@@ -10,14 +10,15 @@ mkdir -p "${log_dir}"
 run_id="${RUN_ID:-$(date -u +"%Y%m%dT%H%M%SZ")}"
 export RUN_ID="${run_id}"
 
-log_file="${log_dir}/scraper-${run_id}.log"
+final_log_file="${log_dir}/scraper-${run_id}.log"
+log_file="$(mktemp "${log_dir}/scraper-${run_id}.XXXXXX")"
 latest_log="${log_dir}/latest.log"
 lock_file="${SCRAPER_LOCK_FILE:-${repo_root}/.scraper.lock}"
 rscript_bin="${RSCRIPT_BIN:-Rscript}"
 SCRAPER_RESULT_FILE=""
+SCRAPER_STATUS=""
 
 exec >>"${log_file}" 2>&1
-ln -sfn "$(basename "${log_file}")" "${latest_log}" 2>/dev/null || true
 
 log() {
   printf '[%s] %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$*"
@@ -89,6 +90,7 @@ run_downstream_if_needed() {
     log "Scraper result file is missing status."
     return 1
   fi
+  SCRAPER_STATUS="$scraper_status"
   if ! revision_id="$(result_value revision_id)"; then
     log "Scraper result file is missing revision_id."
     return 1
@@ -141,9 +143,22 @@ run_downstream_if_needed() {
 }
 
 cleanup() {
+  local exit_status=$?
+
+  trap - EXIT
+
   if [[ -n "${SCRAPER_RESULT_FILE:-}" ]]; then
     rm -f "${SCRAPER_RESULT_FILE}"
   fi
+
+  if [[ "${exit_status}" -eq 0 && "${SCRAPER_STATUS:-}" == "no_change" ]]; then
+    rm -f "${log_file}"
+  else
+    mv -f "${log_file}" "${final_log_file}"
+    ln -sfn "$(basename "${final_log_file}")" "${latest_log}" 2>/dev/null || true
+  fi
+
+  exit "${exit_status}"
 }
 
 trap cleanup EXIT
@@ -160,7 +175,7 @@ fi
 
 log "Scraper run_id=${RUN_ID}"
 log "Repository root=${repo_root}"
-log "Log file=${log_file}"
+log "Log file=${final_log_file}"
 log "Rscript=${rscript_bin}"
 
 run_step "scrape Wikipedia polls" run_scraper
