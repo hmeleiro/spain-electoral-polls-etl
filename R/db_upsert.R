@@ -282,6 +282,21 @@ insert_identity_event <- function(con, poll_id, revision_id, event_type, old_pay
 }
 
 insert_poll_results <- function(con, poll_id, results) {
+  result_keys <- unique(vapply(results, function(result) result$party_key, character(1)))
+  existing_keys <- DBI::dbGetQuery(
+    con,
+    "select party_key from poll_results where poll_id = $1",
+    params = list(poll_id)
+  )
+  stale_keys <- setdiff(existing_keys$party_key, result_keys)
+  for (party_key in stale_keys) {
+    DBI::dbExecute(
+      con,
+      "delete from poll_results where poll_id = $1 and party_key = $2",
+      params = list(poll_id, party_key)
+    )
+  }
+
   for (result in results) {
     DBI::dbExecute(
       con,
@@ -538,6 +553,7 @@ upsert_normalized_polls <- function(con, polls, page_key, revision_id) {
     if (nrow(existing_row) == 1 && identical(existing_row$row_hash[[1]], poll$row_hash)) {
       upsert_poll_match_candidates(con, match$poll_id, revision_id, match, existing)
       update_existing_poll(con, match$poll_id, poll, pollster_id, match$match_type, match$confidence)
+      insert_poll_results(con, match$poll_id, poll$results)
       event_type <- if (match$match_type == "exact") "exact_match" else "probable_match"
       insert_identity_event(con, match$poll_id, revision_id, event_type, old_payload, payload, match$confidence, match$reasons)
       stats$polls_unchanged <- stats$polls_unchanged + 1L

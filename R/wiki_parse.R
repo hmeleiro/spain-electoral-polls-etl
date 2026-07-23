@@ -81,28 +81,94 @@ header_label_from_th <- function(th_node) {
 }
 
 extract_table_headers <- function(table_node, fallback_names) {
-  header_cells <- xml2::xml_find_all(table_node, ".//tr[th][1]/th")
-  if (length(header_cells) == 0) {
+  header_rows <- table_header_rows(table_node)
+  if (length(header_rows) == 0) {
     return(fallback_names)
   }
 
-  headers <- character()
-  for (cell in header_cells) {
-    label <- header_label_from_th(cell)
-    colspan <- suppressWarnings(as.integer(xml2::xml_attr(cell, "colspan")))
-    if (is.na(colspan) || colspan < 1) {
-      colspan <- 1L
-    }
-    headers <- c(headers, rep(label, colspan))
-  }
-
+  headers <- header_leaf_labels(header_rows, length(fallback_names))
   if (length(headers) != length(fallback_names)) {
     return(fallback_names)
   }
 
   headers <- clean_wiki_text(headers)
+  fallback_names <- clean_wiki_text(fallback_names)
   empty <- is.na(headers) | headers == ""
   headers[empty] <- fallback_names[empty]
+  headers
+}
+
+table_header_rows <- function(table_node) {
+  rows <- xml2::xml_find_all(table_node, "./thead/tr|./tbody/tr|./tr")
+  if (length(rows) == 0) {
+    rows <- xml2::xml_find_all(table_node, ".//tr")
+  }
+
+  out <- list()
+  for (row in rows) {
+    has_th <- length(xml2::xml_find_all(row, "./th")) > 0
+    has_td <- length(xml2::xml_find_all(row, "./td")) > 0
+    if (has_th && !has_td) {
+      out[[length(out) + 1]] <- row
+      next
+    }
+    if (length(out) > 0) {
+      break
+    }
+  }
+  out
+}
+
+header_leaf_labels <- function(header_rows, expected_cols) {
+  headers <- rep(NA_character_, expected_cols)
+  active_spans <- vector("list", expected_cols)
+
+  advance_active_span <- function(col) {
+    if (!is.null(active_spans[[col]])) {
+      active_spans[[col]]$remaining <<- active_spans[[col]]$remaining - 1L
+      if (active_spans[[col]]$remaining <= 0L) {
+        active_spans[col] <<- list(NULL)
+      }
+    }
+  }
+
+  for (row in header_rows) {
+    cells <- xml2::xml_find_all(row, "./th")
+    col <- 1L
+
+    for (cell in cells) {
+      while (col <= expected_cols && !is.null(active_spans[[col]])) {
+        advance_active_span(col)
+        col <- col + 1L
+      }
+      if (col > expected_cols) {
+        break
+      }
+
+      label <- header_label_from_th(cell)
+      colspan <- cell_span(cell, "colspan")
+      rowspan <- cell_span(cell, "rowspan")
+      for (offset in seq_len(colspan)) {
+        target_col <- col + offset - 1L
+        if (target_col > expected_cols) {
+          next
+        }
+        if (!is_blank(label)) {
+          headers[[target_col]] <- label
+        }
+        if (rowspan > 1L) {
+          active_spans[[target_col]] <- list(remaining = rowspan - 1L)
+        }
+      }
+      col <- col + colspan
+    }
+
+    while (col <= expected_cols && !is.null(active_spans[[col]])) {
+      advance_active_span(col)
+      col <- col + 1L
+    }
+  }
+
   headers
 }
 
@@ -268,7 +334,7 @@ cell_text_preserving_breaks <- function(cell_node) {
   paste(lines, collapse = "\n")
 }
 
-party_columns <- function(table) {
+party_column_positions <- function(table) {
   names <- names(table)
   start <- match("turnout", names)
   if (is.na(start)) {
@@ -276,9 +342,35 @@ party_columns <- function(table) {
   }
   end <- match("lead", names)
   if (is.na(start) || is.na(end) || end <= start + 1) {
-    return(character())
+    return(integer())
   }
-  names[(start + 1):(end - 1)]
+  (start + 1):(end - 1)
+}
+
+valid_party_column_positions <- function(table, raw_names = names(table)) {
+  indices <- party_column_positions(table)
+  if (length(indices) == 0) {
+    return(integer())
+  }
+  labels <- raw_names[indices]
+  keys <- normalize_text(labels)
+  valid <- !is.na(keys) & keys != "" & !keys %in% c("general")
+  indices[valid]
+}
+
+invalid_party_column_positions <- function(table, raw_names = names(table)) {
+  indices <- party_column_positions(table)
+  if (length(indices) == 0) {
+    return(integer())
+  }
+  labels <- raw_names[indices]
+  keys <- normalize_text(labels)
+  invalid <- is.na(keys) | keys == "" | keys %in% c("general")
+  indices[invalid]
+}
+
+party_columns <- function(table, raw_names = names(table)) {
+  names(table)[valid_party_column_positions(table, raw_names)]
 }
 
 extract_row_values <- function(row_node, expected_cols) {
@@ -431,7 +523,8 @@ parse_poll_table <- function(table_node, year, wiki_page, wiki_revision_id, refe
   raw_names <- names(table)
   normalized_names <- make.unique(vapply(raw_names, header_role, character(1)), sep = "_")
   names(table) <- normalized_names
-  parties <- party_columns(table)
+  parties <- party_columns(table, raw_names = raw_names)
+  invalid_party_positions <- invalid_party_column_positions(table, raw_names = raw_names)
   if (length(parties) == 0) {
     return(list())
   }
@@ -451,6 +544,17 @@ parse_poll_table <- function(table_node, year, wiki_page, wiki_revision_id, refe
     row <- as.list(row_values)
     if (is_non_poll_row(row)) {
       next
+    }
+    invalid_party_values <- row_values[invalid_party_positions]
+    has_invalid_party_value <- any(vapply(invalid_party_values, function(value) {
+      !is_missing_value(value)
+    }, logical(1)))
+    if (has_invalid_party_value) {
+      stop(
+        "Poll row contains values under blank or grouped party headers: ",
+        clean_wiki_text(row$pollster),
+        call. = FALSE
+      )
     }
 
     source_metadata <- extract_row_source_metadata(row_nodes[[i]], reference_map)
@@ -555,6 +659,17 @@ validate_normalized_polls <- function(polls) {
   }, logical(1))
   if (any(bad_percent)) {
     stop("One or more rows contain percentages outside 0-100.", call. = FALSE)
+  }
+
+  bad_party_headers <- vapply(polls, function(poll) {
+    any(vapply(poll$results %||% list(), function(result) {
+      is_blank(result$party_raw %||% NA_character_) ||
+        is_blank(result$party_key %||% NA_character_) ||
+        identical(result$party_key, "unknown")
+    }, logical(1)))
+  }, logical(1))
+  if (any(bad_party_headers)) {
+    stop("One or more rows contain blank or unknown party headers.", call. = FALSE)
   }
 
   bad_dates <- vapply(polls, function(poll) {

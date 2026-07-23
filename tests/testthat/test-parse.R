@@ -22,6 +22,78 @@ test_that("fixture poll table parses and normalizes", {
   expect_true(any(vapply(polls[[1]]$results, function(x) x$party_key == "pp" && x$vote_share == 32.4, logical(1))))
 })
 
+test_that("multi-row grouped headers use leaf party labels", {
+  html <- paste(c(
+    "<html><body>",
+    "<h4>Voting intention estimates</h4>",
+    "<h5>2026</h5>",
+    "<table class='wikitable'>",
+    "<tr>",
+    "<th rowspan='2'>Polling firm/Commissioner</th><th rowspan='2'>Fieldwork date</th><th rowspan='2'>Sample size</th><th rowspan='2'>Turnout</th>",
+    "<th rowspan='2'>PP</th><th rowspan='2'>PSOE</th><th rowspan='2'>Vox</th><th rowspan='2'>Sumar</th>",
+    "<th rowspan='2'>ERC</th><th rowspan='2'>Junts</th><th rowspan='2'>EH Bildu</th><th rowspan='2'>PNV</th>",
+    "<th rowspan='2'>BNG</th><th rowspan='2'>CCa</th><th rowspan='2'>UPN</th><th rowspan='2'>Adelante Andalucia (2021)</th>",
+    "<th colspan='3'>General</th><th rowspan='2'>Lead</th>",
+    "</tr>",
+    "<tr><th>Podemos</th><th>SALF</th><th>Alianca.cat</th></tr>",
+    "<tr>",
+    "<td>CIS (Ateneo del Dato)</td><td>1-6 Jul</td><td>4,020</td><td>?</td>",
+    "<td>30.5<br>135</td><td>27.9<br>114</td><td>16.2<br>54</td><td>7.4<br>14</td>",
+    "<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>",
+    "<td>2.9<br>1</td><td>2.0<br>0</td><td>-</td><td>2.6</td>",
+    "</tr>",
+    "</table>",
+    "</body></html>"
+  ), collapse = "\n")
+
+  records <- parse_wiki_poll_html(html, wiki_revision_id = 789, default_year = 2026)
+  polls <- normalize_poll_records(records)
+  validate_normalized_polls(polls)
+
+  party_keys <- vapply(polls[[1]]$results, function(result) result$party_key, character(1))
+  expect_equal(length(party_keys), 15)
+  expect_false(any(party_keys %in% c("general", "unknown")))
+  expect_true(all(c("adelante_andalucia", "podemos", "salf", "alianca_cat") %in% party_keys))
+})
+
+test_that("blank party headers are ignored before normalization", {
+  html <- paste(c(
+    "<html><body>",
+    "<h4>Voting intention estimates</h4>",
+    "<h5>2026</h5>",
+    "<table class='wikitable'>",
+    "<tr><th>Polling firm/Commissioner</th><th>Fieldwork date</th><th>Sample size</th><th>Turnout</th><th>PP</th><th></th><th>PSOE</th><th>Lead</th></tr>",
+    "<tr><td>40dB/Prisa</td><td>1-2 Jul</td><td>2,000</td><td>?</td><td>32.0</td><td>-</td><td>28.0</td><td>4.0</td></tr>",
+    "</table>",
+    "</body></html>"
+  ), collapse = "\n")
+
+  records <- parse_wiki_poll_html(html, wiki_revision_id = 790, default_year = 2026)
+  polls <- normalize_poll_records(records)
+  validate_normalized_polls(polls)
+
+  party_keys <- vapply(polls[[1]]$results, function(result) result$party_key, character(1))
+  expect_equal(party_keys, c("pp", "psoe"))
+})
+
+test_that("blank party headers with values fail loudly", {
+  html <- paste(c(
+    "<html><body>",
+    "<h4>Voting intention estimates</h4>",
+    "<h5>2026</h5>",
+    "<table class='wikitable'>",
+    "<tr><th>Polling firm/Commissioner</th><th>Fieldwork date</th><th>Sample size</th><th>Turnout</th><th>PP</th><th></th><th>PSOE</th><th>Lead</th></tr>",
+    "<tr><td>40dB/Prisa</td><td>1-2 Jul</td><td>2,000</td><td>?</td><td>32.0</td><td>4.1</td><td>28.0</td><td>4.0</td></tr>",
+    "</table>",
+    "</body></html>"
+  ), collapse = "\n")
+
+  expect_error(
+    parse_wiki_poll_html(html, wiki_revision_id = 791, default_year = 2026),
+    "blank or grouped party headers"
+  )
+})
+
 test_that("historical pages can use a default year without year headings", {
   html <- paste(c(
     "<html><body>",
