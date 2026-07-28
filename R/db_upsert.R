@@ -1,6 +1,6 @@
 run_sql_file <- function(con, path) {
   sql <- paste(readLines(path, warn = FALSE), collapse = "\n")
-  DBI::dbExecute(con, sql)
+  DBI::dbExecute(con, sql, immediate = TRUE)
 }
 
 get_election_id <- function(con, election_key) {

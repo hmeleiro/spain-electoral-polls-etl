@@ -32,6 +32,8 @@ Run migrations in order:
 ```sh
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/001_schema.sql
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/002_indexes.sql
+psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/004_manual_review_workflow.sql
+psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/005_add_november_2019_election.sql
 ```
 
 The schema includes `wiki_pages`, `wiki_page_revisions`, `elections`, `pollsters`, `parties`, `polls`, `poll_results`, `poll_versions`, `poll_identity_events`, `scraper_runs`, and `poll_review_actions`. It also creates public API helper views: `api_polls_public` and `api_poll_results_public`, plus admin review views for visual moderation.
@@ -87,6 +89,8 @@ The default page is `next_spanish_general_election`. To scrape another registere
 PowerShell example to scrape multiple poll pages:
 
 ```powershell
+$env:PAGE_KEY = "spanish_general_election_2019_11"
+Rscript scripts/run_scraper.R
 $env:PAGE_KEY = "spanish_general_election_2023_2019_2021"
 Rscript scripts/run_scraper.R
 $env:PAGE_KEY = "spanish_general_election_2023_2022"
