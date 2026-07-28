@@ -5,6 +5,7 @@ test_that("text, pollster, media, and party names normalize", {
   expect_equal(normalize_media("El País"), "el_pais")
   expect_equal(normalize_party("PSOE"), "psoe")
   expect_equal(normalize_party("EAJ/PNV"), "eaj_pnv")
+  expect_equal(normalize_party("Compromís"), "compromis")
   expect_equal(normalize_party("A New Party"), "a_new_party")
 })
 

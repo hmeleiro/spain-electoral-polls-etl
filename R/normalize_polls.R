@@ -76,6 +76,7 @@ party_dictionary <- function() {
     "prc" = "prc",
     "ev" = "ev",
     "mas pais" = "mas_pais",
+    "compromis" = "compromis",
     "jxcat" = "junts",
     "pacma" = "pacma",
     "others" = "others",
