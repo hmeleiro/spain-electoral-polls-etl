@@ -6,6 +6,13 @@ test_that("text, pollster, media, and party names normalize", {
   expect_equal(normalize_party("PSOE"), "psoe")
   expect_equal(normalize_party("EAJ/PNV"), "eaj_pnv")
   expect_equal(normalize_party("Compromís"), "compromis")
+  expect_equal(normalize_party("FA"), "fa")
+  expect_equal(normalize_party("Broad Front"), "fa")
+  expect_equal(normalize_party("Frente Amplio"), "fa")
+  expect_equal(normalize_party("FV"), "fv")
+  expect_equal(normalize_party("Valencian Front"), "fv")
+  expect_equal(normalize_party("Front Valencià"), "fv")
+  expect_equal(normalize_party("Compromís–Front Valencià"), "fv")
   expect_equal(normalize_party("A New Party"), "a_new_party")
 })
 

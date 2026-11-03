@@ -2,7 +2,7 @@
 
 Technical MVP for collecting Spanish national voting intention polls from Wikipedia into PostgreSQL.
 
-The first supported source is the English Wikipedia page `Opinion polling for the next Spanish general election`. The scraper checks the MediaWiki `revision_id`, stores raw page snapshots, parses national voting intention tables, normalizes rows, matches rows against existing polls, and records version history when Wikipedia corrects data.
+The first supported source is the English Wikipedia page `Opinion polling for the 2026 Spanish general election`. The scraper checks the MediaWiki `revision_id`, stores raw page snapshots, parses national voting intention tables, normalizes rows, matches rows against existing polls, and records version history when Wikipedia corrects data.
 
 ## Install
 
@@ -35,6 +35,7 @@ psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/002_
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/004_manual_review_workflow.sql
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/005_add_november_2019_election.sql
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/006_add_compromis_party.sql
+psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/007_migrate_2026_general_election.sql
 ```
 
 The schema includes `wiki_pages`, `wiki_page_revisions`, `elections`, `pollsters`, `parties`, `polls`, `poll_results`, `poll_versions`, `poll_identity_events`, `scraper_runs`, and `poll_review_actions`. It also creates public API helper views: `api_polls_public` and `api_poll_results_public`, plus admin review views for visual moderation.
@@ -144,7 +145,7 @@ The deploy uses `rsync` over SSH, preserves runtime files such as `.env`,
 
 ## Revision Detection
 
-Before scraping tables, the pipeline calls the MediaWiki API for the latest revision. If `(page_key, revision_id)` already exists in `wiki_page_revisions` with `parse_status = 'success'`, the run is recorded as `no_change` and no polls are inserted.
+Before scraping tables, the pipeline calls the MediaWiki API for the latest revision and resolves redirects to the canonical page. If `(page_key, revision_id)` already exists in `wiki_page_revisions` with `parse_status = 'success'`, the run is recorded as `no_change` and no polls are inserted.
 
 For a new revision, the scraper stores raw HTML and wikitext first. This preserves the source snapshot even if parsing fails.
 
@@ -190,7 +191,7 @@ A single candidate with confidence `>= 0.85` is a `probable_match`. Several clos
 
 When an existing poll matches but its `row_hash` changes, the scraper updates `polls`, upserts `poll_results`, inserts a `poll_versions` payload, and records one or more `poll_identity_events`.
 
-Source metadata is stored on `polls` as `source_url`, `source_title`, `source_reference_ids`, and `source_metadata`. This keeps the extracted publication date auditable against the Wikipedia reference used for that row.
+Source metadata is stored on `polls` as `source_url`, `source_title`, `source_reference_ids`, and `source_metadata`. This keeps the extracted publication date auditable against the Wikipedia reference used for that row. For the 2026 tables, `source_metadata.polling_context` distinguishes rows published with the Broad Front candidacy from rows published before it.
 
 ## Public SQL Views
 

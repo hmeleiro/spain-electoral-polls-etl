@@ -1,9 +1,20 @@
 heading_year <- function(text) {
   value <- clean_wiki_text(text)
-  if (grepl("^20[0-9]{2}$", value)) {
-    return(as.integer(value))
+  if (grepl("^20[0-9]{2}(?:$|\\s*\\()", value, perl = TRUE)) {
+    return(as.integer(substr(value, 1, 4)))
   }
   NA_integer_
+}
+
+heading_polling_context <- function(text) {
+  key <- normalize_text(text)
+  if (grepl("^20[0-9]{2} with broad front$", key)) {
+    return("with_broad_front")
+  }
+  if (grepl("^20[0-9]{2} before broad front$", key)) {
+    return("before_broad_front")
+  }
+  NA_character_
 }
 
 header_role <- function(x) {
@@ -514,7 +525,14 @@ is_non_poll_row <- function(row) {
   FALSE
 }
 
-parse_poll_table <- function(table_node, year, wiki_page, wiki_revision_id, reference_map = list()) {
+parse_poll_table <- function(
+  table_node,
+  year,
+  wiki_page,
+  wiki_revision_id,
+  reference_map = list(),
+  polling_context = NA_character_
+) {
   table <- rvest::html_table(table_node, fill = TRUE, trim = TRUE)
   names(table) <- extract_table_headers(table_node, names(table))
   if (!is_poll_table(table)) {
@@ -581,6 +599,7 @@ parse_poll_table <- function(table_node, year, wiki_page, wiki_revision_id, refe
       source_reference_ids = source_metadata$source_reference_ids,
       source_metadata = source_metadata$source_metadata,
       publication_date_raw = source_metadata$publication_date_raw,
+      polling_context = polling_context,
       notes = NA_character_,
       row_number = i,
       wiki_page = wiki_page,
@@ -603,6 +622,7 @@ parse_wiki_poll_html <- function(
 
   in_poll_section <- FALSE
   current_year <- as.integer(default_year)
+  current_polling_context <- NA_character_
   records <- list()
 
   for (node in nodes) {
@@ -620,6 +640,7 @@ parse_wiki_poll_html <- function(
       year <- heading_year(text)
       if (in_poll_section && !is.na(year)) {
         current_year <- year
+        current_polling_context <- heading_polling_context(text)
       }
       next
     }
@@ -629,7 +650,14 @@ parse_wiki_poll_html <- function(
       if (is.na(table_year)) {
         next
       }
-      parsed <- parse_poll_table(node, table_year, wiki_page, wiki_revision_id, reference_map = reference_map)
+      parsed <- parse_poll_table(
+        node,
+        table_year,
+        wiki_page,
+        wiki_revision_id,
+        reference_map = reference_map,
+        polling_context = current_polling_context
+      )
       records <- c(records, parsed)
     }
   }

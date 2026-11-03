@@ -9,16 +9,21 @@ wiki_request <- function(url, user_agent) {
     httr2::req_retry(max_tries = 3, backoff = ~ 2^.x)
 }
 
-fetch_wiki_revision_info <- function(page_title, user_agent) {
-  response <- wiki_request(wiki_api_url(), user_agent) |>
+wiki_revision_request <- function(page_title, user_agent) {
+  wiki_request(wiki_api_url(), user_agent) |>
     httr2::req_url_query(
       action = "query",
       format = "json",
       prop = "revisions",
       titles = page_title,
+      redirects = 1,
       rvprop = "ids|timestamp",
       rvslots = "main"
-    ) |>
+    )
+}
+
+fetch_wiki_revision_info <- function(page_title, user_agent) {
+  response <- wiki_revision_request(page_title, user_agent) |>
     httr2::req_perform() |>
     httr2::resp_body_json(simplifyVector = FALSE)
 

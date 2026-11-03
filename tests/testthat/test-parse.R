@@ -22,6 +22,47 @@ test_that("fixture poll table parses and normalizes", {
   expect_true(any(vapply(polls[[1]]$results, function(x) x$party_key == "pp" && x$vote_share == 32.4, logical(1))))
 })
 
+test_that("2026 candidacy contexts and party columns are preserved", {
+  poll_table <- function(pollster, parties, values) {
+    paste0(
+      "<table class='wikitable'><tr>",
+      "<th>Polling firm/Commissioner</th><th>Fieldwork date</th>",
+      "<th>Sample size</th><th>Turnout</th>",
+      paste0("<th>", parties, "</th>", collapse = ""),
+      "<th>Lead</th></tr><tr>",
+      "<td>", pollster, "</td><td>1-2 Oct</td><td>1,000</td><td>?</td>",
+      paste0("<td>", values, "</td>", collapse = ""),
+      "<td>4.0</td></tr></table>"
+    )
+  }
+
+  html <- paste0(
+    "<html><body><h4>Voting intention estimates</h4>",
+    "<h5>2026 (with Broad Front)</h5>",
+    poll_table("With/Media", c("PP", "PSOE", "Vox", "FA", "FV"), c("32", "28", "18", "10", "2")),
+    "<h5>2026 (before Broad Front)</h5>",
+    poll_table("Before/Media", c("PP", "PSOE", "Vox", "Sumar", "Podemos"), c("32", "28", "18", "8", "4")),
+    "</body></html>"
+  )
+
+  records <- parse_wiki_poll_html(html, wiki_revision_id = 792, default_year = 2025)
+  polls <- normalize_poll_records(records)
+
+  expect_equal(vapply(records, `[[`, integer(1), "year"), c(2026L, 2026L))
+  expect_equal(
+    vapply(records, `[[`, character(1), "polling_context"),
+    c("with_broad_front", "before_broad_front")
+  )
+  expect_equal(polls[[1]]$source_metadata$polling_context, "with_broad_front")
+  expect_equal(polls[[2]]$source_metadata$polling_context, "before_broad_front")
+
+  with_keys <- vapply(polls[[1]]$results, `[[`, character(1), "party_key")
+  before_keys <- vapply(polls[[2]]$results, `[[`, character(1), "party_key")
+  expect_true(all(c("fa", "fv") %in% with_keys))
+  expect_true(all(c("sumar", "podemos") %in% before_keys))
+  validate_normalized_polls(polls)
+})
+
 test_that("multi-row grouped headers use leaf party labels", {
   html <- paste(c(
     "<html><body>",

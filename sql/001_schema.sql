@@ -156,7 +156,7 @@ create table if not exists poll_match_candidates (
 );
 
 insert into elections (election_key, election_type, territory_code, election_name, election_date)
-values ('congreso_espana_2027', 'general', 'ES', 'Next Spanish general election', null)
+values ('congreso_espana_2026', 'general', 'ES', '2026 Spanish general election', '2026-11-29')
 on conflict (election_key) do update set
   election_type = excluded.election_type,
   territory_code = excluded.territory_code,
@@ -182,9 +182,9 @@ on conflict (election_key) do update set
 insert into wiki_pages (page_key, page_title, url, election_key, territory_code, is_active)
 values (
   'next_spanish_general_election',
-  'Opinion polling for the next Spanish general election',
-  'https://en.wikipedia.org/wiki/Opinion_polling_for_the_next_Spanish_general_election',
-  'congreso_espana_2027',
+  'Opinion polling for the 2026 Spanish general election',
+  'https://en.wikipedia.org/wiki/Opinion_polling_for_the_2026_Spanish_general_election',
+  'congreso_espana_2026',
   'ES',
   true
 )
@@ -217,6 +217,8 @@ values
   ('psoe', 'Partido Socialista Obrero Espanol', 'PSOE', 'ES', '#e30613', 10, true),
   ('pp', 'Partido Popular', 'PP', 'ES', '#1d84ce', 20, true),
   ('vox', 'Vox', 'Vox', 'ES', '#63be21', 30, true),
+  ('fa', 'Frente Amplio', 'FA', 'ES', null, 35, true),
+  ('fv', 'Compromís–Front Valencià', 'FV', 'ES-VC', null, 36, true),
   ('sumar', 'Sumar', 'Sumar', 'ES', '#e51b7e', 40, true),
   ('podemos', 'Podemos', 'Podemos', 'ES', '#6f2c91', 50, true),
   ('cs', 'Ciudadanos', 'Cs', 'ES', '#eb6109', 60, true),

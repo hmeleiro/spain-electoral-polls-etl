@@ -52,21 +52,21 @@ page_registry <- function() {
       "spanish_general_election_2019_11"
     ),
     page_title = c(
-      "Opinion polling for the next Spanish general election",
+      "Opinion polling for the 2026 Spanish general election",
       "Opinion polling for the 2023 Spanish general election",
       "Nationwide opinion polling for the 2023 Spanish general election (2022)",
       "Nationwide opinion polling for the 2023 Spanish general election (2019\u20132021)",
       "Opinion polling for the November 2019 Spanish general election"
     ),
     url = c(
-      "https://en.wikipedia.org/wiki/Opinion_polling_for_the_next_Spanish_general_election",
+      "https://en.wikipedia.org/wiki/Opinion_polling_for_the_2026_Spanish_general_election",
       "https://en.wikipedia.org/wiki/Opinion_polling_for_the_2023_Spanish_general_election",
       "https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2023_Spanish_general_election_(2022)",
       "https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2023_Spanish_general_election_(2019%E2%80%932021)",
       "https://en.wikipedia.org/wiki/Opinion_polling_for_the_November_2019_Spanish_general_election"
     ),
     election_key = c(
-      "congreso_espana_2027",
+      "congreso_espana_2026",
       "congreso_espana_2023",
       "congreso_espana_2023",
       "congreso_espana_2023",
@@ -74,7 +74,7 @@ page_registry <- function() {
     ),
     territory_code = c("ES", "ES", "ES", "ES", "ES"),
     default_year = c(2026L, 2023L, 2022L, 2021L, 2019L),
-    election_date = as.Date(c(NA, "2023-07-23", "2023-07-23", "2023-07-23", "2019-11-10")),
+    election_date = as.Date(c("2026-11-29", "2023-07-23", "2023-07-23", "2023-07-23", "2019-11-10")),
     stringsAsFactors = FALSE
   )
 }

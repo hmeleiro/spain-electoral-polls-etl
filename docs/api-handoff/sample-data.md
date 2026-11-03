@@ -7,8 +7,8 @@ Los ejemplos son simulados pero respetan nombres de columnas y tipos del esquema
 ```json
 {
   "id": 101,
-  "poll_key_strict": "congreso_espana_2027__40db__prisa__2026-05-28__2026-06-01__2000",
-  "poll_signature": "congreso_espana_2027__40db__prisa__2000__2026-06-02",
+  "poll_key_strict": "congreso_espana_2026__40db__prisa__2026-05-28__2026-06-01__2000",
+  "poll_signature": "congreso_espana_2026__40db__prisa__2000__2026-06-02",
   "election_id": 1,
   "pollster_id": 12,
   "media": "Prisa",
@@ -76,7 +76,7 @@ Los ejemplos son simulados pero respetan nombres de columnas y tipos del esquema
   "items": [
     {
       "id": 101,
-      "election_key": "congreso_espana_2027",
+      "election_key": "congreso_espana_2026",
       "pollster_key": "40db",
       "pollster_name": "40dB",
       "media": "Prisa",
@@ -104,7 +104,7 @@ Los ejemplos son simulados pero respetan nombres de columnas y tipos del esquema
 ```json
 {
   "id": 101,
-  "election_key": "congreso_espana_2027",
+  "election_key": "congreso_espana_2026",
   "election_name": "Next Spanish general election",
   "territory_code": "ES",
   "pollster_key": "40db",

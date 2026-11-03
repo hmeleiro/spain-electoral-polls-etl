@@ -7,7 +7,7 @@ Valores de `Uso API`: `public`, `internal`, `admin`, `debug`, `do_not_expose`.
 | Columna | Tipo | Nullable | Descripcion | Uso API | Notas |
 |---|---|---:|---|---|---|
 | `id` | `bigserial` | no | Identificador numerico de la eleccion. | public | Puede usarse como FK interna; exponer tambien `election_key`. |
-| `election_key` | `text` | no | Clave natural unica de eleccion. | public | Ejemplo: `congreso_espana_2027`. |
+| `election_key` | `text` | no | Clave natural unica de eleccion. | public | Ejemplo: `congreso_espana_2026`. |
 | `election_type` | `text` | no | Tipo de eleccion. | public | Ejemplo: `general`. |
 | `territory_code` | `text` | no | Codigo territorial. | public | Ejemplo: `ES`. |
 | `election_name` | `text` | no | Nombre legible de la eleccion. | public |  |

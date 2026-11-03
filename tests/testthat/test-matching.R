@@ -1,6 +1,6 @@
 sample_poll <- function() {
   poll <- list(
-    election_key = "congreso_espana_2027",
+    election_key = "congreso_espana_2026",
     pollster_key = "40db",
     pollster_raw = "40dB",
     media_key = "prisa",
@@ -48,7 +48,7 @@ as_existing <- function(poll, id = 1L) {
 
 test_that("keys, signatures, and row hashes are stable", {
   poll <- sample_poll()
-  expect_match(poll$poll_key_strict, "congreso_espana_2027__40db__prisa")
+  expect_match(poll$poll_key_strict, "congreso_espana_2026__40db__prisa")
   expect_match(poll$poll_signature, "2026-06-05")
   expect_equal(generate_row_hash(poll), poll$row_hash)
 

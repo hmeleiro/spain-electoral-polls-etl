@@ -45,6 +45,14 @@ party_dictionary <- function() {
     "pp" = "pp",
     "people s party" = "pp",
     "vox" = "vox",
+    "fa" = "fa",
+    "broad front" = "fa",
+    "frente amplio" = "fa",
+    "fv" = "fv",
+    "valencian front" = "fv",
+    "front valencia" = "fv",
+    "compromis front valencia" = "fv",
+    "commitment valencian front" = "fv",
     "sumar" = "sumar",
     "podemos" = "podemos",
     "unidas podemos" = "podemos",
@@ -372,7 +380,7 @@ apply_pollster_media_overrides <- function(record, pollster_media) {
   ))
 }
 
-normalize_poll_record <- function(record, election_key = "congreso_espana_2027") {
+normalize_poll_record <- function(record, election_key = "congreso_espana_2026") {
   pollster_media <- split_pollster_media(record$pollster_raw)
   pollster_media <- apply_pollster_media_overrides(record, pollster_media)
   dates <- parse_fieldwork_date(record$fieldwork_raw, record$year)
@@ -392,6 +400,9 @@ normalize_poll_record <- function(record, election_key = "congreso_espana_2027")
     )
   })
   source_metadata <- record$source_metadata %||% list()
+  if (!is_blank(record$polling_context %||% NA_character_)) {
+    source_metadata$polling_context <- record$polling_context
+  }
   if (!is.na(pollster_media$estimate_type)) {
     source_metadata$estimate_type <- pollster_media$estimate_type
     source_metadata$base_pollster <- pollster_media$base_pollster
@@ -466,7 +477,7 @@ resolve_duplicate_poll_keys <- function(polls) {
   polls
 }
 
-normalize_poll_records <- function(records, election_key = "congreso_espana_2027") {
+normalize_poll_records <- function(records, election_key = "congreso_espana_2026") {
   polls <- lapply(records, normalize_poll_record, election_key = election_key)
   resolve_duplicate_poll_keys(polls)
 }

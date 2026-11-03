@@ -44,7 +44,7 @@ Listar elecciones disponibles.
   "items": [
     {
       "id": 1,
-      "election_key": "congreso_espana_2027",
+      "election_key": "congreso_espana_2026",
       "election_type": "general",
       "territory_code": "ES",
       "election_name": "Next Spanish general election",
@@ -118,7 +118,7 @@ Listar encuestas paginadas.
   "items": [
     {
       "id": 101,
-      "election_key": "congreso_espana_2027",
+      "election_key": "congreso_espana_2026",
       "pollster_key": "40db",
       "pollster_name": "40dB",
       "media": "Prisa",
@@ -155,7 +155,7 @@ Ficha completa de una encuesta con resultados.
 ```json
 {
   "id": 101,
-  "election_key": "congreso_espana_2027",
+  "election_key": "congreso_espana_2026",
   "pollster_key": "40db",
   "pollster_name": "40dB",
   "media": "Prisa",
@@ -330,7 +330,7 @@ Listar la bandeja visual de encuestas que requieren revision manual o presentan 
   "items": [
     {
       "poll_id": 202,
-      "election_key": "congreso_espana_2027",
+      "election_key": "congreso_espana_2026",
       "territory_code": "ES",
       "pollster_name": "Example Pollster",
       "media": "Example Media",
@@ -375,7 +375,7 @@ Ninguno.
 ```json
 {
   "poll_id": 202,
-  "election_key": "congreso_espana_2027",
+  "election_key": "congreso_espana_2026",
   "pollster_name": "Example Pollster",
   "media": "Example Media",
   "fieldwork_start": "2026-06-01",
