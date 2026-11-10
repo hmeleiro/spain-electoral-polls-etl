@@ -9,6 +9,7 @@ test_that("text, pollster, media, and party names normalize", {
   expect_equal(normalize_party("FA"), "fa")
   expect_equal(normalize_party("Broad Front"), "fa")
   expect_equal(normalize_party("Frente Amplio"), "fa")
+  expect_equal(normalize_party("FA + FV"), "fa_fv")
   expect_equal(normalize_party("FV"), "fv")
   expect_equal(normalize_party("Valencian Front"), "fv")
   expect_equal(normalize_party("Front Valencià"), "fv")

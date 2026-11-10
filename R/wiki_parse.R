@@ -391,17 +391,25 @@ extract_row_values <- function(row_node, expected_cols) {
   }
 
   values <- character()
+  cell_origins <- integer()
+  cell_colspans <- integer()
+  col <- 1L
   for (cell in cells) {
     colspan <- suppressWarnings(as.integer(xml2::xml_attr(cell, "colspan")))
     if (is.na(colspan) || colspan < 1) {
       colspan <- 1L
     }
     values <- c(values, rep(cell_text_preserving_breaks(cell), colspan))
+    cell_origins <- c(cell_origins, rep(col, colspan))
+    cell_colspans <- c(cell_colspans, rep(colspan, colspan))
+    col <- col + colspan
   }
 
   if (length(values) != expected_cols) {
     return(NULL)
   }
+  attr(values, "cell_origins") <- cell_origins
+  attr(values, "cell_colspans") <- cell_colspans
   values
 }
 
@@ -421,11 +429,15 @@ extract_expanded_row_values <- function(row_nodes, expected_cols) {
     row_node <- row_nodes[[i]]
     cells <- xml2::xml_find_all(row_node, "./td")
     values <- rep(NA_character_, expected_cols)
+    cell_origins <- seq_len(expected_cols)
+    cell_colspans <- rep(1L, expected_cols)
     col <- 1L
 
     for (cell in cells) {
       while (col <= expected_cols && !is.null(active_spans[[col]])) {
         values[[col]] <- active_spans[[col]]$value
+        cell_origins[[col]] <- active_spans[[col]]$origin_col
+        cell_colspans[[col]] <- active_spans[[col]]$colspan
         active_spans[[col]]$remaining <- active_spans[[col]]$remaining - 1L
         if (active_spans[[col]]$remaining <= 0L) {
           active_spans[col] <- list(NULL)
@@ -445,8 +457,15 @@ extract_expanded_row_values <- function(row_nodes, expected_cols) {
           next
         }
         values[[target_col]] <- value
+        cell_origins[[target_col]] <- col
+        cell_colspans[[target_col]] <- colspan
         if (rowspan > 1L) {
-          active_spans[[target_col]] <- list(value = value, remaining = rowspan - 1L)
+          active_spans[[target_col]] <- list(
+            value = value,
+            remaining = rowspan - 1L,
+            origin_col = col,
+            colspan = colspan
+          )
         }
       }
       col <- col + colspan
@@ -454,6 +473,8 @@ extract_expanded_row_values <- function(row_nodes, expected_cols) {
 
     while (col <= expected_cols && !is.null(active_spans[[col]])) {
       values[[col]] <- active_spans[[col]]$value
+      cell_origins[[col]] <- active_spans[[col]]$origin_col
+      cell_colspans[[col]] <- active_spans[[col]]$colspan
       active_spans[[col]]$remaining <- active_spans[[col]]$remaining - 1L
       if (active_spans[[col]]$remaining <= 0L) {
         active_spans[col] <- list(NULL)
@@ -464,11 +485,48 @@ extract_expanded_row_values <- function(row_nodes, expected_cols) {
     if (any(is.na(values))) {
       out[[i]] <- NULL
     } else {
+      attr(values, "cell_origins") <- cell_origins
+      attr(values, "cell_colspans") <- cell_colspans
       out[[i]] <- values
     }
   }
 
   out
+}
+
+extract_party_results <- function(row_values, party_positions, raw_names) {
+  cell_origins <- attr(row_values, "cell_origins")
+  cell_colspans <- attr(row_values, "cell_colspans")
+  if (is.null(cell_origins) || length(cell_origins) != length(row_values)) {
+    cell_origins <- seq_along(row_values)
+  }
+  if (is.null(cell_colspans) || length(cell_colspans) != length(row_values)) {
+    cell_colspans <- rep(1L, length(row_values))
+  }
+
+  results <- list()
+  for (position in party_positions) {
+    origin <- cell_origins[[position]]
+    colspan <- cell_colspans[[position]]
+    covered_positions <- intersect(
+      party_positions,
+      seq.int(origin, min(origin + colspan - 1L, length(row_values)))
+    )
+    raw_value <- row_values[[position]]
+    is_joint_result <- length(covered_positions) > 1L && !is_missing_value(raw_value)
+
+    if (is_joint_result && position != min(covered_positions)) {
+      next
+    }
+
+    party_components <- if (is_joint_result) raw_names[covered_positions] else raw_names[[position]]
+    results[[length(results) + 1L]] <- list(
+      party_raw = paste(party_components, collapse = " + "),
+      party_components = unname(party_components),
+      raw_value = raw_value
+    )
+  }
+  results
 }
 
 is_non_poll_row <- function(row) {
@@ -541,7 +599,8 @@ parse_poll_table <- function(
   raw_names <- names(table)
   normalized_names <- make.unique(vapply(raw_names, header_role, character(1)), sep = "_")
   names(table) <- normalized_names
-  parties <- party_columns(table, raw_names = raw_names)
+  party_positions <- valid_party_column_positions(table, raw_names = raw_names)
+  parties <- names(table)[party_positions]
   invalid_party_positions <- invalid_party_column_positions(table, raw_names = raw_names)
   if (length(parties) == 0) {
     return(list())
@@ -577,15 +636,7 @@ parse_poll_table <- function(
 
     source_metadata <- extract_row_source_metadata(row_nodes[[i]], reference_map)
     source_url <- source_metadata$source_url %||% extract_first_source_url(row_nodes[[i]])
-    party_results <- lapply(parties, function(column) {
-      column_position <- match(column, names(table))
-      original_name <- raw_names[[column_position]]
-      raw_value <- row[[column]]
-      list(
-        party_raw = original_name,
-        raw_value = raw_value
-      )
-    })
+    party_results <- extract_party_results(row_values, party_positions, raw_names)
 
     records[[length(records) + 1]] <- list(
       year = year,

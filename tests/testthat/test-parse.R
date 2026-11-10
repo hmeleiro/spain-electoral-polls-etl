@@ -63,6 +63,35 @@ test_that("2026 candidacy contexts and party columns are preserved", {
   validate_normalized_polls(polls)
 })
 
+test_that("joint FA-FV cells are stored once while separate estimates stay separate", {
+  html <- paste(c(
+    "<html><body>",
+    "<h4>Voting intention estimates</h4>",
+    "<h5>2026 (with Broad Front)</h5>",
+    "<table class='wikitable'>",
+    "<tr><th>Polling firm/Commissioner</th><th>Fieldwork date</th><th>Sample size</th><th>Turnout</th><th>PP</th><th>PSOE</th><th>Vox</th><th>FA</th><th>FV</th><th>Lead</th></tr>",
+    "<tr><td>Joint/Media</td><td>1-2 Nov</td><td>1,000</td><td>?</td><td>30.0</td><td>28.0</td><td>18.0</td><td colspan='2'>7.6<br>11/14</td><td>2.0</td></tr>",
+    "<tr><td>Separate/Media</td><td>3-4 Nov</td><td>1,200</td><td>?</td><td>31.0</td><td>27.0</td><td>19.0</td><td>5.0<br>6</td><td>0.9<br>2</td><td>4.0</td></tr>",
+    "</table>",
+    "</body></html>"
+  ), collapse = "\n")
+
+  records <- parse_wiki_poll_html(html, wiki_revision_id = 793, default_year = 2026)
+  polls <- normalize_poll_records(records)
+  validate_normalized_polls(polls)
+
+  joint_keys <- vapply(polls[[1]]$results, `[[`, character(1), "party_key")
+  separate_keys <- vapply(polls[[2]]$results, `[[`, character(1), "party_key")
+  joint_result <- polls[[1]]$results[[match("fa_fv", joint_keys)]]
+
+  expect_equal(sum(joint_keys == "fa_fv"), 1)
+  expect_false(any(joint_keys %in% c("fa", "fv")))
+  expect_equal(joint_result$vote_share, 7.6)
+  expect_equal(c(joint_result$seats_min, joint_result$seats_max), c(11L, 14L))
+  expect_true(all(c("fa", "fv") %in% separate_keys))
+  expect_false("fa_fv" %in% separate_keys)
+})
+
 test_that("multi-row grouped headers use leaf party labels", {
   html <- paste(c(
     "<html><body>",

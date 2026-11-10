@@ -48,6 +48,9 @@ party_dictionary <- function() {
     "fa" = "fa",
     "broad front" = "fa",
     "frente amplio" = "fa",
+    "fa fv" = "fa_fv",
+    "broad front valencian front" = "fa_fv",
+    "frente amplio front valencia" = "fa_fv",
     "fv" = "fv",
     "valencian front" = "fv",
     "front valencia" = "fv",
@@ -390,8 +393,15 @@ normalize_poll_record <- function(record, election_key = "congreso_espana_2026")
   }
   results <- lapply(record$results %||% list(), function(result) {
     parsed <- parse_result_cell(result$raw_value)
+    party_components <- result$party_components %||% character()
+    component_keys <- unique(vapply(party_components, normalize_party, character(1)))
+    party_key <- if (length(component_keys) > 1L) {
+      paste(component_keys, collapse = "_")
+    } else {
+      normalize_party(result$party_raw)
+    }
     list(
-      party_key = normalize_party(result$party_raw),
+      party_key = party_key,
       party_raw = clean_wiki_text(result$party_raw),
       vote_share = parsed$vote_share,
       seats_min = parsed$seats_min,

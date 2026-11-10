@@ -218,6 +218,7 @@ values
   ('pp', 'Partido Popular', 'PP', 'ES', '#1d84ce', 20, true),
   ('vox', 'Vox', 'Vox', 'ES', '#63be21', 30, true),
   ('fa', 'Frente Amplio', 'FA', 'ES', null, 35, true),
+  ('fa_fv', 'Frente Amplio–Front Valencià', 'FA–FV', 'ES', null, 35, true),
   ('fv', 'Compromís–Front Valencià', 'FV', 'ES-VC', null, 36, true),
   ('sumar', 'Sumar', 'Sumar', 'ES', '#e51b7e', 40, true),
   ('podemos', 'Podemos', 'Podemos', 'ES', '#6f2c91', 50, true),

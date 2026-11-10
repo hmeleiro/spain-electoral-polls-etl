@@ -36,6 +36,7 @@ psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/004_
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/005_add_november_2019_election.sql
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/006_add_compromis_party.sql
 psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/007_migrate_2026_general_election.sql
+psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE -f sql/008_add_joint_fa_fv_party.sql
 ```
 
 The schema includes `wiki_pages`, `wiki_page_revisions`, `elections`, `pollsters`, `parties`, `polls`, `poll_results`, `poll_versions`, `poll_identity_events`, `scraper_runs`, and `poll_review_actions`. It also creates public API helper views: `api_polls_public` and `api_poll_results_public`, plus admin review views for visual moderation.
@@ -192,6 +193,8 @@ A single candidate with confidence `>= 0.85` is a `probable_match`. Several clos
 When an existing poll matches but its `row_hash` changes, the scraper updates `polls`, upserts `poll_results`, inserts a `poll_versions` payload, and records one or more `poll_identity_events`.
 
 Source metadata is stored on `polls` as `source_url`, `source_title`, `source_reference_ids`, and `source_metadata`. This keeps the extracted publication date auditable against the Wikipedia reference used for that row. For the 2026 tables, `source_metadata.polling_context` distinguishes rows published with the Broad Front candidacy from rows published before it.
+
+In the 2026 table, a result cell spanning the FA and FV columns is stored once under `party_key = 'fa_fv'`. Rows with separate FA and FV cells continue to produce the two independent keys `fa` and `fv`.
 
 ## Public SQL Views
 

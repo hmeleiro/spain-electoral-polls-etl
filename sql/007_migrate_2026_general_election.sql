@@ -71,6 +71,7 @@ insert into parties
   (party_key, party_name, short_name, territory_code, color_hex, display_order, is_active)
 values
   ('fa', 'Frente Amplio', 'FA', 'ES', null, 35, true),
+  ('fa_fv', 'Frente Amplio–Front Valencià', 'FA–FV', 'ES', null, 35, true),
   ('fv', 'Compromís–Front Valencià', 'FV', 'ES-VC', null, 36, true)
 on conflict (party_key) do update set
   party_name = excluded.party_name,
