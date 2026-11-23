@@ -136,7 +136,10 @@ where
   or pr.seats_min < 0
   or pr.seats_max > 350
   or pr.seats_min > pr.seats_max
-  or pr.raw_value ~ E'\n[^\n]*\n[^\n]*%[[:space:]]*\\('
+  or (
+    array_length(string_to_array(pr.raw_value, E'\n'), 1) >= 3
+    and position('(' in pr.raw_value) > 0
+  )
 order by p.wiki_page, p.fieldwork_end desc, p.id, pr.party_key;
 ```
 
