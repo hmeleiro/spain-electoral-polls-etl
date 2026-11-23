@@ -38,6 +38,51 @@ test_that("special values parse to typed values", {
   expect_equal(result$vote_share, 33.0)
   expect_equal(result$seats_min, 136L)
   expect_equal(result$seats_max, 136L)
+
+  result <- parse_result_cell("29.9\n125\nPP 29.7% (123) + UPN 0.2% (2)")
+  expect_equal(result$vote_share, 29.9)
+  expect_equal(result$seats_min, 125L)
+  expect_equal(result$seats_max, 125L)
+
+  result <- parse_result_cell("29.9\n121/127\nPP 29.7% (119/125) + UPN 0.2% (2)")
+  expect_equal(result$seats_min, 121L)
+  expect_equal(result$seats_max, 127L)
+
+  result <- parse_result_cell("27.0\u2013\n28.0")
+  expect_equal(result$vote_share, 27.0)
+  expect_true(is.na(result$seats_min))
+  expect_true(is.na(result$seats_max))
+})
+
+test_that("seat projection validation rejects incoherent limits", {
+  valid_poll <- list(
+    poll_key_strict = "fixture_poll",
+    turnout = NA_real_,
+    lead = 2,
+    fieldwork_start = as.Date("2026-11-20"),
+    fieldwork_end = as.Date("2026-11-21"),
+    results = list(list(
+      party_key = "pp",
+      party_raw = "PP",
+      vote_share = 29.9,
+      seats_min = 125L,
+      seats_max = 125L
+    ))
+  )
+
+  expect_invisible(validate_normalized_polls(list(valid_poll)))
+
+  inverted <- valid_poll
+  inverted$results[[1]]$seats_max <- 29L
+  expect_error(validate_normalized_polls(list(inverted)), "fixture_poll/pp \\(125/29\\)")
+
+  unpaired <- valid_poll
+  unpaired$results[[1]]$seats_max <- NA_integer_
+  expect_error(validate_normalized_polls(list(unpaired)), "fixture_poll/pp \\(125/NA\\)")
+
+  out_of_range <- valid_poll
+  out_of_range$results[[1]]$seats_max <- 351L
+  expect_error(validate_normalized_polls(list(out_of_range)), "fixture_poll/pp \\(125/351\\)")
 })
 
 test_that("fieldwork dates parse with implicit years", {

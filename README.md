@@ -112,6 +112,49 @@ Rscript scripts/run_scraper.R
 $env:FORCE_REPROCESS = "false"
 ```
 
+## Repairing Invalid Seat Projections
+
+After deploying a parser correction, a production operator can audit stored
+seat projections with:
+
+```sql
+select
+  p.id as poll_id,
+  p.wiki_page,
+  p.fieldwork_end,
+  p.is_active,
+  ps.pollster_key,
+  pr.party_key,
+  pr.seats_min,
+  pr.seats_max,
+  pr.raw_value
+from polls p
+join pollsters ps on ps.id = p.pollster_id
+join poll_results pr on pr.poll_id = p.id
+where
+  num_nonnulls(pr.seats_min, pr.seats_max) = 1
+  or pr.seats_min < 0
+  or pr.seats_max > 350
+  or pr.seats_min > pr.seats_max
+  or pr.raw_value ~ E'\n[^\n]*\n[^\n]*%[[:space:]]*\\('
+order by p.wiki_page, p.fieldwork_end desc, p.id, pr.party_key;
+```
+
+To repair the current 2026 page, run the normal locked wrapper with forced
+reprocessing from the deployed checkout. This also triggers the configured
+downstream poll-artifact pipeline after a successful scraper transaction:
+
+```sh
+PAGE_KEY=next_spanish_general_election FORCE_REPROCESS=true bash scripts/run_scraper_cron.sh
+```
+
+The production operator should then confirm that the scraper run and page
+revision are marked `success`, that no active results violate the seat bounds
+above, and that the affected PP projections agree with the visible Wikipedia
+table. At the time this incident was diagnosed, the expected values were
+`125/125` for SW Demoscopia and `134/134` for SocioMetrica. Reprocessing must be
+performed by an operator with production database and deployment access.
+
 The main function is:
 
 ```r

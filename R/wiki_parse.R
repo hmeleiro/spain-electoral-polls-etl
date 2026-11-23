@@ -319,6 +319,10 @@ cell_text_preserving_breaks <- function(cell_node) {
   }
 
   for (child in contents) {
+    child_type <- xml2::xml_type(child)
+    if (!child_type %in% c("text", "element")) {
+      next
+    }
     if (identical(xml2::xml_name(child), "br")) {
       if (length(pieces) > 0 && !identical(tail(pieces, 1), "\n")) {
         pieces <- c(pieces, "\n")
@@ -738,6 +742,33 @@ validate_normalized_polls <- function(polls) {
   }, logical(1))
   if (any(bad_percent)) {
     stop("One or more rows contain percentages outside 0-100.", call. = FALSE)
+  }
+
+  seat_issues <- unlist(lapply(polls, function(poll) {
+    poll_key <- poll$poll_key_strict %||% "unknown_poll"
+    issues <- vapply(poll$results %||% list(), function(result) {
+      seats_min <- result$seats_min %||% NA_integer_
+      seats_max <- result$seats_max %||% NA_integer_
+      has_min <- !is.na(seats_min)
+      has_max <- !is.na(seats_max)
+      invalid <- xor(has_min, has_max) ||
+        (has_min && has_max && (seats_min < 0L || seats_max > 350L || seats_min > seats_max))
+      if (!invalid) {
+        return(NA_character_)
+      }
+      paste0(
+        poll_key, "/", result$party_key %||% "unknown_party",
+        " (", ifelse(has_min, seats_min, "NA"), "/", ifelse(has_max, seats_max, "NA"), ")"
+      )
+    }, character(1))
+    issues[!is.na(issues)]
+  }), use.names = FALSE)
+  if (length(seat_issues) > 0) {
+    stop(
+      "One or more results contain incoherent seat projections: ",
+      paste(seat_issues, collapse = ", "),
+      call. = FALSE
+    )
   }
 
   bad_party_headers <- vapply(polls, function(poll) {

@@ -63,6 +63,35 @@ test_that("2026 candidacy contexts and party columns are preserved", {
   validate_normalized_polls(polls)
 })
 
+test_that("result cells ignore HTML comments containing component estimates", {
+  html <- paste(c(
+    "<html><body>",
+    "<h4>Voting intention estimates</h4>",
+    "<h5>2026</h5>",
+    "<table class='wikitable'>",
+    "<tr><th>Polling firm/Commissioner</th><th>Fieldwork date</th><th>Sample size</th><th>Turnout</th><th>PP</th><th>PSOE</th><th>Vox</th><th>FA</th><th>Lead</th></tr>",
+    "<tr><td>SW Demoscopia/La Septima</td><td>26 Oct-21 Nov</td><td>12,000</td><td>?</td>",
+    "<td>29.9<br><span>125</span><!-- PP 29.7% (123) + UPN 0.2% (2) --></td>",
+    "<td>32.5<br><span>134</span></td><td>15.8<br><span>50</span></td>",
+    "<td>6.8<br><span>9/11</span><!-- FA 6.2% (8/10) + allies 0.6% (1) --></td><td>2.6</td></tr>",
+    "</table>",
+    "</body></html>"
+  ), collapse = "\n")
+
+  records <- parse_wiki_poll_html(html, wiki_revision_id = 794, default_year = 2026)
+  polls <- normalize_poll_records(records)
+  validate_normalized_polls(polls)
+
+  party_keys <- vapply(polls[[1]]$results, `[[`, character(1), "party_key")
+  pp <- polls[[1]]$results[[match("pp", party_keys)]]
+  fa <- polls[[1]]$results[[match("fa", party_keys)]]
+
+  expect_equal(c(pp$seats_min, pp$seats_max), c(125L, 125L))
+  expect_equal(pp$raw_value, "29.9\n125")
+  expect_equal(c(fa$seats_min, fa$seats_max), c(9L, 11L))
+  expect_equal(fa$raw_value, "6.8\n9/11")
+})
+
 test_that("joint FA-FV cells are stored once while separate estimates stay separate", {
   html <- paste(c(
     "<html><body>",

@@ -132,6 +132,22 @@ parse_sample_size <- function(x) {
   as.integer(value)
 }
 
+parse_seat_projection <- function(x) {
+  value <- clean_wiki_text(x)
+  match <- regexec("^(\\d{1,3})(?:\\s*/\\s*(\\d{1,3}))?$", value, perl = TRUE)
+  parts <- regmatches(value, match)[[1]]
+  if (length(parts) < 2) {
+    return(list(seats_min = NA_integer_, seats_max = NA_integer_))
+  }
+
+  seats_min <- as.integer(parts[[2]])
+  seats_max <- seats_min
+  if (length(parts) >= 3 && nzchar(parts[[3]])) {
+    seats_max <- as.integer(parts[[3]])
+  }
+  list(seats_min = seats_min, seats_max = seats_max)
+}
+
 parse_result_cell <- function(x) {
   raw <- clean_wiki_text(x)
   if (is_missing_value(raw)) {
@@ -143,21 +159,11 @@ parse_result_cell <- function(x) {
   lines <- lines[nzchar(lines)]
   if (length(lines) >= 2) {
     vote_share <- parse_percent(lines[[1]])
-    seat_text <- paste(lines[-1], collapse = " ")
-    seat_numbers <- regmatches(seat_text, gregexpr("\\d+", seat_text, perl = TRUE))[[1]]
-    seats_min <- NA_integer_
-    seats_max <- NA_integer_
-    if (length(seat_numbers) >= 1) {
-      seats_min <- as.integer(seat_numbers[[1]])
-      seats_max <- seats_min
-    }
-    if (length(seat_numbers) >= 2) {
-      seats_max <- as.integer(seat_numbers[[2]])
-    }
+    seats <- parse_seat_projection(lines[[2]])
     return(list(
       vote_share = vote_share,
-      seats_min = seats_min,
-      seats_max = seats_max,
+      seats_min = seats$seats_min,
+      seats_max = seats$seats_max,
       raw_value = paste(lines, collapse = "\n")
     ))
   }
