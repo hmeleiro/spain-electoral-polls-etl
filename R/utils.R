@@ -46,6 +46,7 @@ page_registry <- function() {
   data.frame(
     page_key = c(
       "next_spanish_general_election",
+      "next_spanish_general_election_2023_2024",
       "spanish_general_election_2023",
       "spanish_general_election_2023_2022",
       "spanish_general_election_2023_2019_2021",
@@ -53,6 +54,7 @@ page_registry <- function() {
     ),
     page_title = c(
       "Opinion polling for the 2026 Spanish general election",
+      "Nationwide opinion polling for the 2026 Spanish general election (2023–2024)",
       "Opinion polling for the 2023 Spanish general election",
       "Nationwide opinion polling for the 2023 Spanish general election (2022)",
       "Nationwide opinion polling for the 2023 Spanish general election (2019\u20132021)",
@@ -60,6 +62,7 @@ page_registry <- function() {
     ),
     url = c(
       "https://en.wikipedia.org/wiki/Opinion_polling_for_the_2026_Spanish_general_election",
+      "https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2026_Spanish_general_election_(2023%E2%80%932024)",
       "https://en.wikipedia.org/wiki/Opinion_polling_for_the_2023_Spanish_general_election",
       "https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2023_Spanish_general_election_(2022)",
       "https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2023_Spanish_general_election_(2019%E2%80%932021)",
@@ -67,14 +70,15 @@ page_registry <- function() {
     ),
     election_key = c(
       "congreso_espana_2026",
+      "congreso_espana_2026",
       "congreso_espana_2023",
       "congreso_espana_2023",
       "congreso_espana_2023",
       "congreso_espana_2019_11"
     ),
-    territory_code = c("ES", "ES", "ES", "ES", "ES"),
-    default_year = c(2026L, 2023L, 2022L, 2021L, 2019L),
-    election_date = as.Date(c("2026-11-29", "2023-07-23", "2023-07-23", "2023-07-23", "2019-11-10")),
+    territory_code = c("ES", "ES", "ES", "ES", "ES", "ES"),
+    default_year = c(2026L, 2024L, 2023L, 2022L, 2021L, 2019L),
+    election_date = as.Date(c("2026-11-29", "2026-11-29", "2023-07-23", "2023-07-23", "2023-07-23", "2019-11-10")),
     stringsAsFactors = FALSE
   )
 }

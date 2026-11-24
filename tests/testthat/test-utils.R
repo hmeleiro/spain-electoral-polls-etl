@@ -24,6 +24,21 @@ test_that("current election page uses the canonical 2026 source", {
   expect_equal(page$election_date[[1]], as.Date("2026-11-29"))
 })
 
+test_that("2023-2024 polls for the 2026 election use their canonical source", {
+  page <- get_page_definition("next_spanish_general_election_2023_2024")
+
+  expected_title <- "Nationwide opinion polling for the 2026 Spanish general election (2023–2024)"
+  expect_identical(charToRaw(page$page_title[[1]]), charToRaw(expected_title))
+  expect_equal(
+    page$url[[1]],
+    "https://en.wikipedia.org/wiki/Nationwide_opinion_polling_for_the_2026_Spanish_general_election_(2023%E2%80%932024)"
+  )
+  expect_equal(page$election_key[[1]], "congreso_espana_2026")
+  expect_equal(page$territory_code[[1]], "ES")
+  expect_equal(page$default_year[[1]], 2024L)
+  expect_equal(page$election_date[[1]], as.Date("2026-11-29"))
+})
+
 test_that("revision requests resolve MediaWiki redirects", {
   request <- wiki_revision_request(
     "Opinion polling for the next Spanish general election",
