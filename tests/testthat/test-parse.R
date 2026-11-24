@@ -92,6 +92,54 @@ test_that("result cells ignore HTML comments containing component estimates", {
   expect_equal(fa$raw_value, "6.8\n9/11")
 })
 
+test_that("pollster names containing pollster are not treated as repeated headers", {
+  repeated_header <- list(
+    pollster = "Polling firm/Commissioner",
+    fieldwork = "Fieldwork date",
+    sample_size = "Sample size",
+    turnout = "Turnout"
+  )
+  atlas_row <- list(
+    pollster = "AtlasIntel/PollsterGraph",
+    fieldwork = "20-23 Nov",
+    sample_size = "1,045",
+    turnout = "?"
+  )
+
+  expect_true(is_non_poll_row(repeated_header))
+  expect_false(is_non_poll_row(atlas_row))
+
+  html <- paste(c(
+    "<html><body>",
+    "<h4>Voting intention estimates</h4>",
+    "<h5>2026 (Oct-Nov)</h5>",
+    "<table class='wikitable'>",
+    "<tr><th>Polling firm/Commissioner</th><th>Fieldwork date</th><th>Sample size</th><th>Turnout</th><th>PP</th><th>PSOE</th><th>Vox</th><th>FA</th><th>FV</th><th>Lead</th></tr>",
+    "<tr><td>AtlasIntel/PollsterGraph</td><td>20-23 Nov</td><td>1,045</td><td>?</td>",
+    "<td>29.1<br>121</td><td>29.8<br>120</td><td>17.8<br>64</td>",
+    "<td colspan='2'>7.4<br>13</td><td>0.7</td></tr>",
+    "</table>",
+    "</body></html>"
+  ), collapse = "\n")
+
+  records <- parse_wiki_poll_html(html, wiki_revision_id = 795, default_year = 2026)
+  polls <- normalize_poll_records(records)
+  validate_normalized_polls(polls)
+
+  expect_length(polls, 1)
+  expect_equal(polls[[1]]$pollster_key, "atlasintel")
+  expect_equal(polls[[1]]$media_key, "pollstergraph")
+  expect_equal(polls[[1]]$sample_size, 1045L)
+  expect_equal(polls[[1]]$fieldwork_start, as.Date("2026-11-20"))
+  expect_equal(polls[[1]]$fieldwork_end, as.Date("2026-11-23"))
+
+  party_keys <- vapply(polls[[1]]$results, `[[`, character(1), "party_key")
+  pp <- polls[[1]]$results[[match("pp", party_keys)]]
+  fa_fv <- polls[[1]]$results[[match("fa_fv", party_keys)]]
+  expect_equal(c(pp$vote_share, pp$seats_min, pp$seats_max), c(29.1, 121, 121))
+  expect_equal(c(fa_fv$vote_share, fa_fv$seats_min, fa_fv$seats_max), c(7.4, 13, 13))
+})
+
 test_that("joint FA-FV cells are stored once while separate estimates stay separate", {
   html <- paste(c(
     "<html><body>",

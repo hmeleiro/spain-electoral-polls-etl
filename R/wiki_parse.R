@@ -549,8 +549,13 @@ is_non_poll_row <- function(row) {
     return(TRUE)
   }
 
-  repeated_header_pattern <- "polling firm|pollster|commissioner|fieldwork date|sample size"
-  if (grepl(repeated_header_pattern, row_key)) {
+  repeated_header <- pollster_key %in% c(
+    "polling firm",
+    "pollster",
+    "commissioner",
+    "polling firm commissioner"
+  ) || fieldwork_key == "fieldwork date" || sample_key == "sample size"
+  if (repeated_header) {
     return(TRUE)
   }
 
